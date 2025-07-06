@@ -1,0 +1,11 @@
+
+# Dependencies
+**/node_modules
+
+# Environment
+.env
+/backend/.env
+
+# IDE specific
+.vscode
+GEMINI.md
