@@ -1,47 +1,59 @@
 <script>
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
+  import BrandContainer from "./lib/BrandContainer.svelte";
+  import ActionsMenu from "./lib/ActionsMenu.svelte";
+
+  let joinCode = "";
+
+  function handleJoin() {
+    if (joinCode.trim()) {
+      console.log("Joining with code:", joinCode);
+      // Handle join logic here
+    }
+  }
+
+  function handleCreate() {
+    console.log("Creating new session");
+    // Handle create logic here
+  }
 </script>
 
 <main>
-  <div>
-    <a href="https://vite.dev" target="_blank" rel="noreferrer">
-      <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
-
-  <div class="card">
-    <Counter />
-  </div>
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
+  <BrandContainer />
+  <ActionsMenu bind:joinCode onJoin={handleJoin} onCreate={handleCreate} />
+  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
+  @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,600;1,400&display=swap");
+
+  main {
+    height: 100vh;
+    max-height: 100vh;
+    background-color: #ffff00;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    font-family: "Instrument Serif", serif;
+    position: relative;
+    overflow: hidden;
   }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
+
+  .attribution {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 20pt;
+    color: #000;
+    font-family: Helvetica, Arial, sans-serif;
+    font-weight: 400;
   }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
-  }
-  .read-the-docs {
-    color: #888;
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .attribution {
+      font-size: 16pt;
+    }
   }
 </style>
