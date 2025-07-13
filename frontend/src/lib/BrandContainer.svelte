@@ -6,7 +6,11 @@
 
 <style>
   .brand-container {
-    margin-bottom: 4rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    justify-content: center;
   }
 
   .brand-box {
@@ -14,7 +18,11 @@
     padding: 2rem 3rem;
     border-radius: 20px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .brand-box:hover {
@@ -23,6 +31,7 @@
   }
 
   .brand-title {
+    font-family: "Instrument Serif", serif;
     font-size: 100pt;
     font-weight: 400;
     margin: 0;

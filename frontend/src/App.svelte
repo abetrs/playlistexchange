@@ -1,59 +1,50 @@
 <script>
-  import BrandContainer from "./lib/BrandContainer.svelte";
-  import ActionsMenu from "./lib/ActionsMenu.svelte";
+  import Home from "./routes/Home.svelte";
+  import Create from "./routes/Create.svelte";
+  import Join from "./routes/Join.svelte";
 
-  let joinCode = "";
+  let currentPath = $state(window.location.pathname);
 
-  function handleJoin() {
-    if (joinCode.trim()) {
-      console.log("Joining with code:", joinCode);
-      // Handle join logic here
-    }
+  // Simple routing logic
+  function updatePath() {
+    currentPath = window.location.pathname;
   }
 
-  function handleCreate() {
-    console.log("Creating new session");
-    // Handle create logic here
+  // Listen for navigation events
+  window.addEventListener("popstate", updatePath);
+
+  // Custom navigation function
+  function navigate(path) {
+    window.history.pushState({}, "", path);
+    updatePath();
   }
+
+  // Make navigate available globally for other components
+  window.navigate = navigate;
 </script>
 
-<main>
-  <BrandContainer />
-  <ActionsMenu bind:joinCode onJoin={handleJoin} onCreate={handleCreate} />
-  <div class="attribution">By ReallyAbe</div>
-</main>
+{#if currentPath === "/"}
+  <Home />
+{:else if currentPath === "/create"}
+  <Create />
+{:else if currentPath.startsWith("/join/")}
+  <Join params={{ code: currentPath.split("/")[2] }} />
+{:else}
+  <Home />
+{/if}
 
 <style>
-  @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,600;1,400&display=swap");
-
-  main {
-    height: 100vh;
-    max-height: 100vh;
-    background-color: #ffff00;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
+  :global(body) {
+    margin: 0;
+    padding: 0;
     font-family: "Instrument Serif", serif;
-    position: relative;
+  }
+
+  :global(#app) {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
-  }
-
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
-  }
-
-  /* Responsive design */
-  @media (max-width: 768px) {
-    .attribution {
-      font-size: 16pt;
-    }
   }
 </style>

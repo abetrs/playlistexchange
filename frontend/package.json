@@ -12,5 +12,8 @@
     "@sveltejs/vite-plugin-svelte": "^5.1.0",
     "svelte": "^5.34.7",
     "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "svelte-routing": "^2.13.0"
   }
 }

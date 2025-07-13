@@ -16,17 +16,17 @@
   .actions-container {
     display: flex;
     flex-direction: column;
-    gap: 3rem;
-    align-items: flex-start;
+    align-items: center;
+    gap: 1.5rem;
     width: 100%;
-    max-width: 1000px;
-    /* Remove transform, let's use a different approach */
+    max-width: 500px;
   }
 
   /* Responsive design */
   @media (max-width: 768px) {
     .actions-container {
-      align-items: center;
+      max-width: 95vw;
+      gap: 1rem;
     }
   }
 </style>

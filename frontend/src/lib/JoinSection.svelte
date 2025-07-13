@@ -17,41 +17,53 @@
 
 <style>
   .join-section {
-    display: grid;
-    grid-template-columns: 220px 100px 1fr;
+    display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 15px;
+    gap: 1rem;
     width: 100%;
+    max-width: 500px;
+    justify-content: center;
   }
 
   .action-label {
-    font-size: 70pt;
+    font-size: 24pt;
     font-weight: 400;
     color: #000;
-    text-align: left;
-    justify-self: start;
+    text-align: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: 120px;
+    min-width: 120px;
   }
 
   .arrow {
-    font-size: 70pt;
+    font-size: 24pt;
     color: #000;
     text-align: center;
-    justify-self: center;
-    width: 100%;
+    margin: 0 0.5rem;
+    transition:
+      font-size 0.2s,
+      opacity 0.2s;
+    flex-shrink: 0;
+    max-width: 2em;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
   .code-input {
-    font-size: 48pt;
+    font-size: 24pt;
     font-family: "Instrument Serif", serif;
-    padding: 1rem 2rem;
-    border: none;
+    padding: 1rem 1.5rem;
+    border: 3px solid #000;
     border-radius: 15px;
     background-color: #e8e8d0;
     color: #000;
     text-align: center;
-    min-width: 300px;
+    min-width: 120px;
+    width: 100%;
+    box-sizing: border-box;
     outline: none;
-    justify-self: start;
   }
 
   .code-input::placeholder {
@@ -59,28 +71,31 @@
   }
 
   /* Responsive design */
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .join-section {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      align-items: center;
-      text-align: center;
+      max-width: 95vw;
+      gap: 0.5rem;
     }
-
     .action-label {
-      font-size: 40pt;
-      text-align: center;
+      font-size: 18pt;
     }
-
     .arrow {
-      font-size: 40pt;
-      transform: rotate(90deg);
+      font-size: 16pt;
     }
-
     .code-input {
-      font-size: 28pt;
-      min-width: 200px;
+      font-size: 16pt;
+      min-width: 80px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .join-section {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+    .arrow {
+      display: none;
     }
   }
 </style>
