@@ -5,6 +5,7 @@
 # Environment
 .env
 /backend/.env
+serviceAccountKey.json
 
 # IDE specific
 .vscode
