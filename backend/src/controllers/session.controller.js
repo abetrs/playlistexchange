@@ -13,10 +13,10 @@ const createSession = async (req, res) => {
       });
     }
 
-    // Validate group size is a positive number
-    if (isNaN(groupSize) || groupSize <= 0) {
+    // Validate group size is a positive number within limits
+    if (isNaN(groupSize) || groupSize <= 0 || groupSize > 20) {
       return res.status(400).json({
-        message: "Group size must be a positive number",
+        message: "Group size must be between 1 and 20",
       });
     }
 
@@ -48,14 +48,26 @@ const createSession = async (req, res) => {
 const joinSession = async (req, res) => {
   try {
     const { code } = req.params;
-    const { userName } = req.body;
+    const { userCode } = req.body;
 
     // Validate required fields
-    if (!userName) {
+    if (!userCode) {
       return res.status(400).json({
-        message: "User name is required",
+        message: "User code is required",
       });
     }
+
+    // Check if user exists
+    const userRef = db.collection("users").doc(userCode);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const userData = userDoc.data();
 
     const sessionRef = db.collection("sessions").doc(code);
     const doc = await sessionRef.get();
@@ -68,7 +80,7 @@ const joinSession = async (req, res) => {
 
     // Check if user is already in the session
     const existingParticipant = sessionData.participants.find(
-      (p) => p.name === userName
+      (p) => p.userCode === userCode
     );
     if (existingParticipant) {
       return res.status(409).json({
@@ -83,11 +95,14 @@ const joinSession = async (req, res) => {
       });
     }
 
-    // Add the new user to the participants array
+    // Add the user to the participants array
     await sessionRef.update({
       participants: admin.firestore.FieldValue.arrayUnion({
-        name: userName,
-        // you can add more user data here later
+        userCode: userCode,
+        name: userData.name,
+        lastfmUsername: userData.lastfmUsername,
+        spotifyId: userData.spotifyId,
+        joinedAt: new Date(),
       }),
     });
 
@@ -97,6 +112,11 @@ const joinSession = async (req, res) => {
       groupName: sessionData.name,
       currentMembers: sessionData.participants.length + 1,
       totalMembers: sessionData.maxSize,
+      user: {
+        userCode: userCode,
+        name: userData.name,
+        lastfmUsername: userData.lastfmUsername,
+      },
     });
   } catch (error) {
     console.error("Error joining session:", error);
@@ -138,8 +158,75 @@ const getSessionParticipants = async (req, res) => {
     }
 
     const sessionData = doc.data();
+    const participantsList = sessionData.participants || [];
 
-    res.status(200).json(sessionData.participants || []);
+    // Fetch full user data for each participant
+    const enrichedParticipants = await Promise.all(
+      participantsList.map(async (participant) => {
+        try {
+          const userRef = db.collection("users").doc(participant.userCode);
+          const userDoc = await userRef.get();
+
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            return {
+              userCode: participant.userCode,
+              name: userData.name,
+              avatar: userData.avatar || null,
+              lastfmUsername: userData.lastfmUsername,
+              spotifyId: userData.spotifyId,
+              spotifyConnected: !!userData.spotifyId,
+              lastfmConnected: !!userData.lastfmUsername,
+              topArtists: userData.profileData?.lastfm?.topArtists || [],
+              compatibilityScore: null, // This would be calculated based on music taste matching
+              online: true, // This would be determined by real-time presence
+              joinedAt: participant.joinedAt,
+              profileData: userData.profileData || null,
+            };
+          } else {
+            // If user document doesn't exist, return basic participant data
+            return {
+              userCode: participant.userCode,
+              name: participant.name,
+              avatar: null,
+              lastfmUsername: participant.lastfmUsername,
+              spotifyId: participant.spotifyId,
+              spotifyConnected: !!participant.spotifyId,
+              lastfmConnected: !!participant.lastfmUsername,
+              topArtists: [],
+              compatibilityScore: null,
+              online: true,
+              joinedAt: participant.joinedAt,
+              profileData: null,
+            };
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching user data for ${participant.userCode}:`,
+            error
+          );
+          // Return basic participant data on error
+          return {
+            userCode: participant.userCode,
+            name: participant.name,
+            avatar: null,
+            lastfmUsername: participant.lastfmUsername,
+            spotifyId: participant.spotifyId,
+            spotifyConnected: !!participant.spotifyId,
+            lastfmConnected: !!participant.lastfmUsername,
+            topArtists: [],
+            compatibilityScore: null,
+            online: true,
+            joinedAt: participant.joinedAt,
+            profileData: null,
+          };
+        }
+      })
+    );
+
+    res.status(200).json({
+      participants: enrichedParticipants,
+    });
   } catch (error) {
     console.error("Error fetching session participants:", error);
     res.status(500).json({ message: "Failed to fetch session participants." });
