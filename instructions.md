@@ -4,9 +4,17 @@ This file will guide our collaboration in building "The Playlist Exchange" appli
 
 ---
 
+## ⚠️ Important Development Guidelines
+
+**Testing Policy:** Do not attempt to test, run, or start the application unless explicitly requested by the user. Focus on code generation, analysis, and architectural guidance only.
+
+---
+
 ## 🚀 Project Overview
 
-**Idea:** The Playlist Exchange ("Itch") is an application that connects users with similar music tastes, allowing them to exchange playlists through a session-based system. The app uses Spotify and Last.fm APIs to analyze user taste profiles and facilitate music discovery exchanges.
+**The Playlist Exchange ("Itch")** is a session-based music discovery application that connects users with similar tastes for playlist exchanges. Users create or join sessions, share their music profiles via Last.fm/Spotify, and discover new music through taste-matched participants.
+
+**Current Status:** Core session management, user creation, and participants dashboard fully implemented. Ready for music profile integration and matching algorithms.
 
 **Tech Stack:** 
 - **Backend:** Node.js/Express with Firebase/Firestore database
@@ -17,26 +25,28 @@ This file will guide our collaboration in building "The Playlist Exchange" appli
 
 ---
 
-### � MVP Features (Current Implementation Status)
+### ✅ MVP Features (Current Implementation Status)
 
-✅ **Completed:**
+**Completed:**
 1. **Basic Project Structure:** Full-stack setup with modular backend architecture
-2. **Session Management:** Create sessions with group names/sizes, join with codes, Firestore integration
-3. **Frontend Navigation:** Custom routing system with Home, Create, and Join pages
+2. **Session Management:** Create/join sessions with codes, Firestore integration, room capacity enforcement
+3. **Frontend Navigation:** Custom routing system with Home, Create, Join, and Participants pages
 4. **UI Components:** Complete component library with responsive design
-5. **Last.fm Integration:** Basic service setup for fetching user top artists
-6. **Session API Endpoints:** Complete CRUD operations for sessions and participants
-7. **Authentication Routes:** Last.fm OAuth authentication flow with Firestore user storage
+5. **User Management:** Full CRUD operations for users with Last.fm integration
+6. **Participants Dashboard:** Real-time session view with participant cards and capacity display
+7. **Join Flow:** Complete user creation and session joining with Last.fm username input
+8. **Share Functionality:** Copy session join links with modal feedback system
+9. **Last.fm Integration:** OAuth authentication flow with Firestore user storage
+10. **Room Capacity Management:** Backend validation and frontend error handling for full sessions
 
-🔄 **In Progress:**
-8. **Music Service Authentication:** OAuth flows for Spotify/Last.fm (Last.fm completed, Spotify pending)
-9. **User Profile Management:** Database models for participants and music profiles (Last.fm users implemented)
+**In Progress:**
+11. **Spotify Integration:** OAuth2 authentication flow (backend ready, frontend pending)
 
-⏳ **Planned:**
-8. **Taste Profile Analysis:** Process API data to create compatibility profiles
-9. **User Matching Algorithm:** Compare profiles to generate compatibility scores
-10. **Real-time Updates:** WebSocket support for live session updates
-11. **Results Display:** UI for showing matched participants and recommendations
+**Planned:**
+12. **Taste Profile Analysis:** Process API data to create compatibility profiles
+13. **User Matching Algorithm:** Compare profiles to generate compatibility scores
+14. **Real-time Updates:** WebSocket support for live session updates
+15. **Results Display:** UI for showing matched participants and recommendations
 
 ---
 
@@ -55,11 +65,13 @@ backend/
 │   ├── controllers/             # Request handlers
 │   │   ├── health.controller.js
 │   │   ├── session.controller.js
+│   │   ├── user.controller.js   # User CRUD operations
 │   │   ├── lastfm.controller.js
 │   │   └── auth.controller.js   # Last.fm OAuth authentication
 │   ├── routes/                  # API endpoints
 │   │   ├── health.route.js
 │   │   ├── session.route.js
+│   │   ├── user.route.js        # User management routes
 │   │   ├── lastfm.route.js
 │   │   └── auth.route.js        # Authentication routes
 │   └── services/                # External API integration
@@ -77,17 +89,19 @@ frontend/
 │   ├── main.js                  # Application entry point
 │   ├── app.css                  # Global styles and fonts
 │   ├── App.svelte               # Root component with routing
+│   ├── config.js                # API endpoints configuration
 │   ├── routes/                  # Page components
 │   │   ├── Home.svelte          # Landing page
 │   │   ├── Create.svelte        # Session creation
-│   │   └── Join.svelte          # Session joining
+│   │   ├── Join.svelte          # Session joining with user creation
+│   │   └── Participants.svelte  # Session dashboard with participant management
 │   ├── lib/                     # Reusable components
 │   │   ├── BrandContainer.svelte
 │   │   ├── ActionsMenu.svelte
 │   │   ├── CreateSection.svelte
 │   │   ├── JoinSection.svelte
 │   │   └── Counter.svelte       # Example component
-│   └── assets/                  # Static resources
+│   └── assets/                  # Static resources (Last.fm, Spotify icons)
 ├── index.html
 ├── package.json
 └── vite.config.js
@@ -100,23 +114,84 @@ frontend/
 - `GET /health` - Server health check
 - `POST /session` - Create new session with group name/size
 - `GET /session/:code` - Retrieve session information
-- `GET /session/:code/participants` - Get list of participants in a session
+- `GET /session/:code/participants` - Get enriched list of participants in a session
 - `POST /session/:code/join` - Add user to session
+- `POST /user` - Create new user with name and Last.fm username
+- `GET /user/:code` - Get user by user code
+- `GET /user/lastfm/:username` - Find user by Last.fm username
+- `PUT /user/:code` - Update user information
+- `DELETE /user/:code` - Delete user
 - `GET /lastfm/top-artists/:user` - Fetch Last.fm user top artists
 - `GET /auth/lastfm` - Initiate Last.fm OAuth authentication
 - `GET /auth/lastfm/callback` - Handle Last.fm OAuth callback
 
-**Frontend Navigation Flow:**
+**Frontend Pages:**
 
 1. **Home Page** (`Home.svelte`) - Entry point with join/create options
-2. **Create Page** (`Create.svelte`) - Set up new music exchange sessions  
-3. **Join Page** (`Join.svelte`) - Join existing sessions with music service connection
+2. **Create Page** (`Create.svelte`) - Session creation with group name and size selection
+3. **Join Page** (`Join.svelte`) - Join sessions with name and Last.fm username input
+4. **Participants Page** (`Participants.svelte`) - Dashboard showing session participants and status
+
+### New Features Implemented
+
+**Participants Dashboard (`Participants.svelte`):**
+- Real-time participant cards displaying user avatars (initials), names, and connection status
+- Empty slot indicators that only show when less than 2 participants (to avoid clutter)
+- Session information header with code and member count
+- Share functionality with modal feedback system
+- Start Exchange button (disabled until 2+ participants)
+- Responsive grid layout for participant cards
+
+**Enhanced Join Flow (`Join.svelte`):**
+- Last.fm username input field (accepts any input as valid Last.fm username)
+- Complete user creation and session joining workflow
+- Automatic navigation to participants page after successful join
+- Session code pre-population from URL parameters
+- Form validation for all required fields
+
+**User Management System:**
+- Complete user CRUD operations with unique user codes
+- User model includes name, Last.fm username, Spotify ID, and profile data
+- Automatic user code generation (8-character UUID)
+- Integration with session participant system
+
+**Share System:**
+- Copy-to-clipboard functionality for session join links (`/join/{sessionCode}`)
+- Modal popup feedback (5-second display) instead of button text changes
+- Success/error state handling with different modal styles
+- Fallback support for older browsers
+
+**Error Handling:**
+
+Backend validation includes:
+
+- Session capacity limits (1-20 participants)
+- Room full detection (HTTP 403 with "Session is full" message)
+- Duplicate user prevention (HTTP 409 for users already in session)
+- Input validation for group size and required fields
+
+Frontend error handling includes:
+
+- Specific error messages for full sessions
+- Network error detection and user-friendly messages
+- Form validation before API calls
+- Modal feedback for user actions
 
 **Key UI Components:**
 
 - `BrandContainer.svelte` - Displays "Itch" brand title (Instrument Serif font)
 - `ActionsMenu.svelte` - Home page join/create interface
 - `CreateSection.svelte` & `JoinSection.svelte` - Specialized form components
+- `Participants.svelte` - Dashboard with participant cards, session info, and actions
+
+**UI/UX Patterns:**
+
+- **Modal System:** Non-intrusive feedback for user actions (copy success/failure)
+- **Progressive Disclosure:** Empty participant slots only shown when needed (< 2 users)
+- **Avatar Generation:** Automatic initials-based avatars from user names
+- **Responsive Cards:** Participant information displayed in adaptive grid layout
+- **Status Indicators:** Clear visual feedback for connection states and user presence
+- **Action Feedback:** Immediate visual confirmation for user interactions
 
 **Current Color Scheme:**
 
@@ -170,6 +245,7 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
 **API Response Examples:**
 
 **Auth Initiation Response:**
+
 ```json
 {
   "message": "Last.fm authentication URL generated",
@@ -179,6 +255,7 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
 ```
 
 **Auth Callback Success:**
+
 ```json
 {
   "message": "Successfully authenticated with Last.fm",
@@ -194,6 +271,7 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
 ```
 
 **Auth Callback Error:**
+
 ```json
 {
   "message": "Failed to authenticate with Last.fm",
@@ -203,11 +281,30 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
 }
 ```
 
-### Session Management Pattern
+### Application Flow
 
-**Create Flow:** User enters group name and selects group size (1-20 people), backend generates unique session codes using UUID
+**Create Session Flow:**
 
-**Join Flow:** User enters join code, provides name, connects music service, gets added to session participant list
+1. User enters group name and selects group size (1-20 people)
+2. Backend generates unique 6-character session code
+3. User redirected to `/join/{sessionCode}` to add themselves to the session
+4. After joining, user navigated to `/participants/{sessionCode}` dashboard
+
+**Join Session Flow:**
+
+1. User enters session code, display name, and Last.fm username
+2. System validates session exists and has available capacity
+3. If session is full, displays specific "session is full" error message
+4. If space available, creates new user account and adds to session
+5. User navigated to `/participants/{sessionCode}` dashboard
+
+**Participants Dashboard Flow:**
+
+1. Displays session information (name, code, member count)
+2. Shows participant cards with avatars, names, and connection status
+3. Empty slots shown only when less than 2 participants
+4. Share button copies join link with modal feedback
+5. Start Exchange button enabled when 2+ participants present
 
 **Database Models (Firestore):**
 
@@ -219,18 +316,33 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
   maxSize: 5,              // Selected group size (1-20)
   participants: [          // Array of participant objects
     {
+      userCode: "USER1234",
       name: "John Doe",
-      // Music profile data will be added here
+      lastfmUsername: "johndoe_music",
+      spotifyId: null,
+      joinedAt: Timestamp
     }
   ],
   createdAt: Timestamp,    // Creation date
   status: "waiting"        // Session status
 }
+
+// User Document
+{
+  code: "USER1234",        // 8-character uppercase UUID (document ID)
+  name: "John Doe",        // User's display name
+  lastfmUsername: "johndoe_music", // Last.fm username
+  spotifyId: null,         // Spotify user ID (when connected)
+  createdAt: Timestamp,    // Account creation date
+  updatedAt: Timestamp,    // Last modification date
+  profileData: {           // Music service profile data
+    lastfm: null,          // Last.fm profile data
+    spotify: null          // Spotify profile data
+  }
+}
 ```
 
 ### Music Service Integration
-
-**Current Backend:** Last.fm API integration (`lastfm.service.js`), Express server with modular routes
 
 **Environment Variables (.env):**
 
@@ -239,20 +351,6 @@ LASTFM_API_KEY=your_api_key
 LASTFM_API_SECRET=your_api_secret
 SESSION_SECRET=your_session_secret
 GOOGLE_APPLICATION_CREDENTIALS="./serviceAccountKey.json"
-```
-
-**Frontend Connection Pattern:**
-
-```javascript
-function connectLastfm() {
-  console.log("Connecting to Last.fm with name:", userName);
-  // Redirects to backend auth flow (to be implemented)
-}
-
-function connectSpotify() {
-  console.log("Connecting to Spotify with name:", userName);
-  // Redirects to backend auth flow (to be implemented)
-}
 ```
 
 ### Development Patterns to Follow
@@ -273,25 +371,33 @@ function connectSpotify() {
 
 **Navigation Implementation:**
 
+Custom routing system using Svelte 5 `$state()` with URL parameter support:
+
 ```javascript
-// Custom routing system in App.svelte
+// Global navigation function in App.svelte
 function navigate(path) {
   window.history.pushState({}, "", path);
   updatePath();
 }
-
-// Make available globally for components
 window.navigate = navigate;
 
-// Usage in components
-function goBack() {
-  window.navigate("/");
-}
-
-function navigateToJoin(code) {
-  window.navigate(`/join/${code}`);
-}
+// Routing logic with parameter extraction
+{#if currentPath === "/"}
+  <Home />
+{:else if currentPath.startsWith("/join/")}
+  <Join params={{ code: currentPath.split("/")[2] }} />
+{:else if currentPath.startsWith("/participants/")}
+  <Participants params={{ code: currentPath.split("/")[2] }} />
+{/if}
 ```
+
+Routes:
+
+- `/` - Home page
+- `/create` - Session creation
+- `/join` - Join form (standalone)
+- `/join/{sessionCode}` - Join form with pre-filled session code
+- `/participants/{sessionCode}` - Session dashboard
 
 ### Required Backend Enhancements
 

@@ -1,12 +1,65 @@
 <script>
   import BrandContainer from "../lib/BrandContainer.svelte";
+  import { API_ENDPOINTS } from "../config.js";
 
   let groupName = "";
   let groupSize = 1;
+  let isLoading = false;
+  let errorMessage = "";
+  let successMessage = "";
 
-  function handleCreate() {
-    console.log("Creating group:", { groupName, groupSize });
-    // Handle create logic here
+  async function handleCreate() {
+    // Reset messages
+    errorMessage = "";
+    successMessage = "";
+
+    // Validate inputs
+    if (!groupName.trim()) {
+      errorMessage = "Please enter a group name";
+      return;
+    }
+
+    if (groupSize < 1 || groupSize > 20) {
+      errorMessage = "Group size must be between 1 and 20";
+      return;
+    }
+
+    isLoading = true;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.SESSIONS, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          groupName: groupName.trim(),
+          groupSize: parseInt(groupSize),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        successMessage = `Session created successfully! Code: ${data.sessionCode}`;
+
+        // Store session code for future use
+        sessionStorage.setItem("sessionCode", data.sessionCode);
+        sessionStorage.setItem("isCreator", "true");
+
+        // Redirect to join page so creator can add themselves to the session
+        setTimeout(() => {
+          window.navigate(`/join/${data.sessionCode}`);
+        }, 1500);
+      } else {
+        errorMessage = data.message || "Failed to create session";
+      }
+    } catch (error) {
+      console.error("Error creating session:", error);
+      errorMessage = "Network error. Please check if the server is running.";
+    } finally {
+      isLoading = false;
+    }
   }
 
   function goBack() {
@@ -33,6 +86,7 @@
           bind:value={groupName}
           placeholder="What?"
           class="group-name-input"
+          disabled={isLoading}
         />
       </div>
 
@@ -46,10 +100,38 @@
           max="20"
           bind:value={groupSize}
           class="size-slider"
+          disabled={isLoading}
         />
       </div>
 
       <div class="user-count">{groupSize} users</div>
+
+      <!-- Error Message -->
+      {#if errorMessage}
+        <div class="message error-message">
+          {errorMessage}
+        </div>
+      {/if}
+
+      <!-- Success Message -->
+      {#if successMessage}
+        <div class="message success-message">
+          {successMessage}
+        </div>
+      {/if}
+
+      <!-- Create Button -->
+      <button
+        class="create-button"
+        on:click={handleCreate}
+        disabled={isLoading || !groupName.trim()}
+      >
+        {#if isLoading}
+          Creating...
+        {:else}
+          Create Session
+        {/if}
+      </button>
     </div>
   </div>
 
@@ -84,14 +166,14 @@
     background-color: #e8e8d0;
     border: 3px solid #000;
     border-radius: 15px;
-    padding: 3rem;
-    width: 90%;
-    max-width: 600px;
+    padding: 2rem;
+    width: 85%;
+    max-width: 500px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   }
 
   .menu-title {
-    font-size: 24pt;
+    font-size: 22pt;
     font-weight: 400;
     color: #000;
     margin: 0;
@@ -102,7 +184,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .back-button {
@@ -125,7 +207,7 @@
   .form-section {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.5rem;
   }
 
   .input-group,
@@ -136,24 +218,24 @@
   }
 
   label {
-    font-size: 24pt;
+    font-size: 20pt;
     font-weight: 400;
     color: #000;
-    min-width: 150px;
+    min-width: 120px;
     text-align: left;
   }
 
   .arrow {
-    font-size: 24pt;
+    font-size: 20pt;
     color: #000;
     margin: 0 0.5rem;
   }
 
   .group-name-input {
     flex: 1;
-    font-size: 20pt;
+    font-size: 18pt;
     font-family: "Instrument Serif", serif;
-    padding: 0.8rem 1rem;
+    padding: 0.6rem 0.8rem;
     border: 2px solid #000;
     border-radius: 8px;
     background-color: #f5f5f5;
@@ -218,12 +300,75 @@
   }
 
   .user-count {
-    font-size: 3.2em;
+    font-size: 2.5em;
     font-weight: 400;
     color: #000;
     text-align: center;
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     line-height: 1.1;
+  }
+
+  .message {
+    padding: 0.8rem;
+    border-radius: 8px;
+    font-size: 14pt;
+    text-align: center;
+    margin: 0.8rem 0;
+    border: 2px solid;
+  }
+
+  .error-message {
+    background-color: #ffe6e6;
+    border-color: #ff4444;
+    color: #cc0000;
+  }
+
+  .success-message {
+    background-color: #e6ffe6;
+    border-color: #44ff44;
+    color: #006600;
+  }
+
+  .create-button {
+    font-size: 18pt;
+    font-family: "Instrument Serif", serif;
+    font-weight: 400;
+    padding: 0.8rem 1.5rem;
+    background-color: #d0d0b8;
+    color: #000;
+    border: 3px solid #000;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 0.8rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .create-button:hover:not(:disabled) {
+    background-color: #b8b8a0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .create-button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .create-button:disabled {
+    background-color: #e8e8e8;
+    color: #999;
+    border-color: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .group-name-input:disabled,
+  .size-slider:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   /* Responsive design */

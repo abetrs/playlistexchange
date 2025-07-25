@@ -2,6 +2,7 @@
   import Home from "./routes/Home.svelte";
   import Create from "./routes/Create.svelte";
   import Join from "./routes/Join.svelte";
+  import Participants from "./routes/Participants.svelte";
 
   let currentPath = $state(window.location.pathname);
 
@@ -27,8 +28,12 @@
   <Home />
 {:else if currentPath === "/create"}
   <Create />
+{:else if currentPath === "/join"}
+  <Join />
 {:else if currentPath.startsWith("/join/")}
   <Join params={{ code: currentPath.split("/")[2] }} />
+{:else if currentPath.startsWith("/participants/")}
+  <Participants params={{ code: currentPath.split("/")[2] }} />
 {:else}
   <Home />
 {/if}

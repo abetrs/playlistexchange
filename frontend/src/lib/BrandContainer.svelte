@@ -6,7 +6,7 @@
 
 <style>
   .brand-container {
-    margin-bottom: 1.5rem;
+    margin-bottom: 3rem;
     width: 100%;
     max-width: 500px;
     display: flex;
