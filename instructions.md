@@ -122,12 +122,17 @@ frontend/
 - `PUT /user/:code` - Update user information
 - `DELETE /user/:code` - Delete user
 - `GET /lastfm/top-artists/:user` - Fetch Last.fm user top artists
+- `GET /lastfm/top-albums/:user` - Get top albums for a user
+- `GET /lastfm/top-tracks/:user` - Get top tracks for a user
+- `GET /lastfm/user/:user` - Get user info
+- `GET /user/:code/lastfm` - Get Last.fm data for specific user
+- `GET /user/session/:sessionCode/lastfm` - Get Last.fm data for all session participants
 - `GET /auth/lastfm` - Initiate Last.fm OAuth authentication
 - `GET /auth/lastfm/callback` - Handle Last.fm OAuth callback
 
 **Frontend Pages:**
 
-1. **Home Page** (`Home.svelte`) - Entry point with join/create options
+1. **Home Page** (`Home.svelte`) - Entry point with join/create options and session rejoin functionality
 2. **Create Page** (`Create.svelte`) - Session creation with group name and size selection
 3. **Join Page** (`Join.svelte`) - Join sessions with name and Last.fm username input
 4. **Participants Page** (`Participants.svelte`) - Dashboard showing session participants and status
@@ -143,11 +148,13 @@ frontend/
 - Responsive grid layout for participant cards
 
 **Enhanced Join Flow (`Join.svelte`):**
-- Last.fm username input field (accepts any input as valid Last.fm username)
+- Last.fm username validation (checks if username exists on Last.fm)
 - Complete user creation and session joining workflow
+- Duplicate user detection (checks for existing name or Last.fm username in session)
 - Automatic navigation to participants page after successful join
 - Session code pre-population from URL parameters
 - Form validation for all required fields
+- LocalStorage session tracking for rejoining functionality
 
 **User Management System:**
 - Complete user CRUD operations with unique user codes
@@ -160,6 +167,18 @@ frontend/
 - Modal popup feedback (5-second display) instead of button text changes
 - Success/error state handling with different modal styles
 - Fallback support for older browsers
+
+**Session Persistence & Rejoin System:**
+- LocalStorage tracking of user's last joined session
+- "Join Session" button on home page for quick rejoining
+- Automatic session info storage (session code, user name, session name)
+- Dismissible rejoin prompt with visual feedback
+
+**User Validation & Duplicate Prevention:**
+- Real-time Last.fm username validation using Last.fm API
+- Duplicate user detection (checks both display name and Last.fm username)
+- Automatic redirection to existing session if duplicate found
+- Alert notification for users attempting to rejoin with existing credentials
 
 **Error Handling:**
 
@@ -200,87 +219,6 @@ Frontend error handling includes:
 - Borders: `#000` (black, 2-3px solid)
 - Interactive elements: `#f5f5f5` with hover states
 
-### Last.fm Authentication System
-
-**Implementation Status:** ✅ **Completed**
-
-The Last.fm OAuth authentication flow has been fully implemented with Firestore integration:
-
-**Authentication Flow:**
-
-1. **Initiate Authentication:** `GET /auth/lastfm`
-   - Returns JSON with Last.fm authorization URL
-   - Frontend handles the redirect to Last.fm
-   - Uses `LASTFM_API_KEY` from environment variables
-
-2. **Handle Callback:** `GET /auth/lastfm/callback`
-   - Processes token from Last.fm callback
-   - Exchanges token for session key using signed API request
-   - Saves user data to Firestore `users` collection
-   - Returns JSON response with success/error status
-
-**User Data Storage (Firestore `users` collection):**
-
-```javascript
-{
-  lastfmUsername: "user123",          // Document ID
-  sessionKey: "abc123...",            // For API authentication
-  realName: "John Doe",               // User's real name
-  url: "https://last.fm/user/user123", // Profile URL
-  country: "United States",           // User location
-  age: "25",                          // User age
-  gender: "m",                        // User gender
-  subscriber: "0",                    // Subscription status
-  playcount: "5000",                  // Total track plays
-  playlists: "10",                    // Number of playlists
-  registered: {                       // Registration details
-    unixtime: "1234567890",
-    text: "2009-02-13 15:31"
-  },
-  createdAt: Timestamp,               // First auth
-  updatedAt: Timestamp                // Last auth
-}
-```
-
-**API Response Examples:**
-
-**Auth Initiation Response:**
-
-```json
-{
-  "message": "Last.fm authentication URL generated",
-  "authUrl": "http://www.last.fm/api/auth/?api_key=YOUR_API_KEY",
-  "success": true
-}
-```
-
-**Auth Callback Success:**
-
-```json
-{
-  "message": "Successfully authenticated with Last.fm",
-  "success": true,
-  "user": {
-    "lastfmUsername": "user123",
-    "realName": "John Doe",
-    "url": "https://last.fm/user/user123",
-    "country": "United States",
-    "playcount": "5000"
-  }
-}
-```
-
-**Auth Callback Error:**
-
-```json
-{
-  "message": "Failed to authenticate with Last.fm",
-  "success": false,
-  "error": "session_error",
-  "details": {...}
-}
-```
-
 ### Application Flow
 
 **Create Session Flow:**
@@ -305,42 +243,6 @@ The Last.fm OAuth authentication flow has been fully implemented with Firestore 
 3. Empty slots shown only when less than 2 participants
 4. Share button copies join link with modal feedback
 5. Start Exchange button enabled when 2+ participants present
-
-**Database Models (Firestore):**
-
-```javascript
-// Session Document
-{
-  code: "ABC123",           // 6-character uppercase UUID
-  name: "My Music Group",   // User-provided group name
-  maxSize: 5,              // Selected group size (1-20)
-  participants: [          // Array of participant objects
-    {
-      userCode: "USER1234",
-      name: "John Doe",
-      lastfmUsername: "johndoe_music",
-      spotifyId: null,
-      joinedAt: Timestamp
-    }
-  ],
-  createdAt: Timestamp,    // Creation date
-  status: "waiting"        // Session status
-}
-
-// User Document
-{
-  code: "USER1234",        // 8-character uppercase UUID (document ID)
-  name: "John Doe",        // User's display name
-  lastfmUsername: "johndoe_music", // Last.fm username
-  spotifyId: null,         // Spotify user ID (when connected)
-  createdAt: Timestamp,    // Account creation date
-  updatedAt: Timestamp,    // Last modification date
-  profileData: {           // Music service profile data
-    lastfm: null,          // Last.fm profile data
-    spotify: null          // Spotify profile data
-  }
-}
-```
 
 ### Music Service Integration
 
@@ -543,21 +445,463 @@ npm install
 npm run dev  # Vite dev server
 ```
 
-### Testing API Endpoints
-
-- Health Check: `GET http://localhost:3000/health`
-- Create Session: `POST http://localhost:3000/session`
-- Get Session: `GET http://localhost:3000/session/{code}`
-- Get Session Participants: `GET http://localhost:3000/session/{code}/participants`
-- Join Session: `POST http://localhost:3000/session/{code}/join`
-- Last.fm Data: `GET http://localhost:3000/lastfm/top-artists/{username}`
-- Last.fm Auth: `GET http://localhost:3000/auth/lastfm`
-- Last.fm Callback: `GET http://localhost:3000/auth/lastfm/callback`
-
 ### Environment Setup
 
-Ensure `.env` file exists in backend directory with required API keys and Firebase credentials.
+Ensure `.env` file exists in backend directory with required API keys and Firebase credentials:
+
+```bash
+LASTFM_API_KEY=your_api_key
+LASTFM_API_SECRET=your_api_secret
+SESSION_SECRET=your_session_secret
+GOOGLE_APPLICATION_CREDENTIALS="./serviceAccountKey.json"
+```
 
 ---
 
-This instructions file reflects the current implementation state and provides guidance for continuing development of The Playlist Exchange application. All major structural components are in place, with the next phase focusing on completing authentication flows and implementing the matching algorithm.
+## 🧪 Testing & Development Tools
+
+### API Tester - Terminal User Interface
+
+**Location:** `backend/api-tester.js`
+
+A comprehensive Terminal User Interface (TUI) program for testing all API routes with dummy data.
+
+**Features:**
+- 🎯 **Interactive Menu**: Select from predefined API routes or create custom requests
+- 🎨 **Colorful Output**: Easy-to-read colored responses and error messages
+- 📊 **Detailed Responses**: Shows status codes, headers, and response data
+- 🔧 **Custom Requests**: Create your own API requests on the fly
+- 🏥 **Health Check**: Automatically checks if the server is running
+- ⚡ **Fast & Easy**: No need to manually write curl commands or use Postman
+
+**Usage:**
+```bash
+cd backend
+npm run api-test
+# or
+node api-tester.js
+```
+
+**Available Test Routes:**
+- 🏥 **Health Check** - `GET /health`
+- 🔐 **Initiate LastFM Auth** - `GET /auth/lastfm`
+- 🔑 **LastFM Auth Callback** - `GET /auth/lastfm/callback`
+- 🎵 **Get Top Artists** - `GET /lastfm/top-artists/{user}`
+- 📝 **Create Session** - `POST /session`
+- 📋 **Get Session** - `GET /session/{code}`
+- 👥 **Get Session Participants** - `GET /session/{code}/participants`
+- 🚪 **Join Session** - `POST /session/{code}/join`
+- 👤 **Create User** - `POST /user`
+- 👥 **Get All Users** - `GET /user`
+- 👤 **Get User by Code** - `GET /user/{code}`
+- ✏️ **Update User** - `PUT /user/{code}`
+- 🗑️ **Delete User** - `DELETE /user/{code}`
+- 🎵 **Get User by LastFM Username** - `GET /user/lastfm/{username}`
+
+**Sample Test Data:**
+```json
+// Session Creation
+{
+  "name": "Test Session",
+  "description": "A test session created by API tester",
+  "createdBy": "test-user-123"
+}
+
+// User Creation
+{
+  "lastfmUsername": "testuser123",
+  "displayName": "Test User",
+  "email": "test@example.com"
+}
+```
+
+### Comprehensive Backend Route Testing
+
+**Location:** `backend/test-all-routes.js`
+
+A comprehensive test script that validates all API endpoints with automated testing flows.
+
+**Usage:**
+```bash
+cd backend
+npm test
+# or
+npm run test-routes
+# or
+node test-all-routes.js
+```
+
+**Test Features:**
+- **Automatic Testing**: Health check → session flow → validation testing
+- **Error Handling**: Tests full sessions, duplicate users, missing fields
+- **Last.fm Integration**: API endpoint testing with environment validation
+- **Interactive Option**: Manual Last.fm OAuth flow testing
+- **Color-coded Output**: Green (success), Yellow (partial), Red (failure), Blue (info)
+
+**Test Coverage:**
+- Server connectivity validation
+- Session creation, retrieval, and joining workflow
+- User management CRUD operations
+- Last.fm API integration endpoints
+- Error cases and validation rules
+- Environment configuration warnings
+
+**Output Format:**
+```bash
+🟢 ✓ Health check passed
+🟢 ✓ Session creation successful
+🟢 ✓ Session retrieval working
+🟡 ⚠ Last.fm API keys not configured
+🔴 ✗ Failed test with detailed error info
+```
+
+---
+
+## 🎵 Comprehensive Last.fm Integration
+
+### Complete Last.fm Service Implementation
+
+**Location:** `backend/src/services/lastfm.service.js`
+
+The service layer provides direct access to all Last.fm API endpoints with comprehensive error handling.
+
+**Available Methods:**
+
+```javascript
+// Top Lists
+getTopArtists(user, period, limit)    // Get top artists for a user
+getTopAlbums(user, period, limit)     // Get top albums for a user  
+getTopTracks(user, period, limit)     // Get top tracks for a user
+
+// User Information
+getUserInfo(user)                     // Get user profile information
+```
+
+**Parameters:**
+- `user` (required) - Last.fm username
+- `period` (optional) - Time period: overall, 7day, 1month, 3month, 6month, 12month (default: overall)
+- `limit` (optional) - Number of results (default: 10)
+
+### Direct Last.fm API Routes
+
+**Available Endpoints:**
+
+```javascript
+GET /lastfm/top-artists/:user     // Get top artists
+GET /lastfm/top-albums/:user      // Get top albums
+GET /lastfm/top-tracks/:user      // Get top tracks
+GET /lastfm/user/:user            // Get user info
+```
+
+**Query Parameters:**
+- `period` - Time period for top lists
+- `limit` - Number of results to return
+
+**Example Usage:**
+```bash
+GET /lastfm/top-artists/johndoe_music?period=1month&limit=15
+GET /lastfm/user/johndoe_music
+```
+
+### Integrated User Routes
+
+These routes integrate Last.fm data with the application's user database:
+
+```javascript
+GET /user/:code/lastfm              // Get Last.fm data for specific user
+GET /user/session/:sessionCode/lastfm  // Get Last.fm data for all session participants
+```
+
+**Query Parameters:**
+- `dataType` - Type of data: artists, albums, tracks, info (default: artists)
+- `period` - Time period for top lists (not applicable for info)
+- `limit` - Number of results
+
+**Example Responses:**
+
+**Top Artists Response:**
+```json
+{
+  "topartists": {
+    "artist": [
+      {
+        "name": "Radiohead",
+        "playcount": "1337",
+        "mbid": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+        "url": "https://www.last.fm/music/Radiohead",
+        "streamable": "0",
+        "image": [...]
+      }
+    ],
+    "@attr": {
+      "user": "testuser",
+      "total": "50",
+      "page": "1",
+      "perPage": "10",
+      "totalPages": "5"
+    }
+  }
+}
+```
+
+**User Profile Response:**
+```json
+{
+  "user": {
+    "name": "testuser",
+    "realname": "Test User",
+    "url": "https://www.last.fm/user/testuser",
+    "country": "United States",
+    "playcount": "12345",
+    "artist_count": "567",
+    "playlists": "8",
+    "registered": {
+      "unixtime": "1234567890",
+      "#text": "2009-02-13 15:31"
+    }
+  }
+}
+```
+
+**Session Profile Response:**
+```json
+{
+  "session": {
+    "code": "ABC123",
+    "name": "My Music Group"
+  },
+  "participants": [
+    {
+      "user": {
+        "code": "USER1234",
+        "name": "John Doe",
+        "lastfmUsername": "johndoe_music"
+      },
+      "lastfmData": {...}
+    },
+    {
+      "user": {
+        "code": "USER5678",
+        "name": "Jane Smith",
+        "lastfmUsername": null
+      },
+      "error": "no_lastfm_username",
+      "lastfmData": null
+    }
+  ],
+  "dataType": "artists",
+  "period": "overall",
+  "limit": 5
+}
+```
+
+### Enhanced Database Integration
+
+**Session Document (Firestore):**
+
+```javascript
+{
+  code: "ABC123",           // 6-character uppercase UUID
+  name: "My Music Group",   // User-provided group name
+  maxSize: 5,              // Selected group size (1-20)
+  participants: [          // Array of participant objects
+    {
+      userCode: "USER1234",
+      name: "John Doe",
+      lastfmUsername: "johndoe_music",
+      spotifyId: null,
+      joinedAt: Timestamp
+    }
+  ],
+  createdAt: Timestamp,    // Creation date
+  status: "waiting"        // Session status
+}
+```
+
+**Complete User Model (Firestore):**
+
+```javascript
+{
+  code: "USER1234",                   // 8-character uppercase UUID (document ID)
+  name: "John Doe",                   // User's display name
+  lastfmUsername: "johndoe_music",    // Last.fm username
+  spotifyId: null,                    // Spotify user ID (when connected)
+  createdAt: Timestamp,               // Account creation date
+  updatedAt: Timestamp,               // Last modification date
+  profileData: {                      // Music service profile data
+    lastfm: null,                     // Last.fm profile data
+    spotify: null                     // Spotify profile data
+  }
+}
+```
+
+**Last.fm Authentication Storage (Firestore `lastfm_users` collection):**
+
+```javascript
+{
+  lastfmUsername: "user123",          // Document ID
+  sessionKey: "abc123...",            // For API authentication
+  realName: "John Doe",               // User's real name
+  url: "https://last.fm/user/user123", // Profile URL
+  country: "United States",           // User location
+  age: "25",                          // User age
+  gender: "m",                        // User gender
+  subscriber: "0",                    // Subscription status
+  playcount: "5000",                  // Total track plays
+  playlists: "10",                    // Number of playlists
+  registered: {                       // Registration details
+    unixtime: "1234567890",
+    text: "2009-02-13 15:31"
+  },
+  createdAt: Timestamp,               // First auth
+  updatedAt: Timestamp                // Last auth
+}
+```
+
+### Error Handling
+
+**Comprehensive error handling for:**
+- Last.fm API errors (user not found, API key issues, rate limiting)
+- Application errors (missing usernames, invalid parameters, database errors)
+- Network errors and timeouts
+
+**Error Response Format:**
+```json
+{
+  "message": "Last.fm user not found",
+  "error": "lastfm_user_not_found",
+  "user": {
+    "code": "USER1234",
+    "name": "John Doe",
+    "lastfmUsername": "invalid_user"
+  }
+}
+```
+
+---
+
+## 👥 Session Participants Page Implementation
+
+### Complete Participants Dashboard
+
+**Location:** `frontend/src/routes/Participants.svelte`
+
+A comprehensive session dashboard that follows the established design system with advanced social features.
+
+**Key Features:**
+
+**Session Header:**
+- Session name display with status badge
+- Join code with copy-to-clipboard functionality
+- Participant progress bar (X/Y members)
+- Visual capacity indicators
+
+**Sorting & Filtering:**
+- Sort by join order or alphabetical
+- Filter by connected services (All/Spotify/Last.fm)
+- Real-time search functionality
+
+**Participant Grid:**
+- Responsive card layout optimized for all screen sizes
+- User avatars with music note placeholders
+- Names and connected service indicators
+- Top artists displayed as tags
+- Compatibility scores with color coding
+- Online/offline status indicators
+
+**Empty State Management:**
+- Placeholder cards for unfilled slots
+- Welcome message for new sessions
+- Progressive disclosure (only show empty slots when < 2 participants)
+
+**Actions Menu:**
+- Refresh button for manual updates
+- Share session functionality with modal feedback
+- Start Exchange button (enabled when 2+ participants)
+
+### User Modal Component
+
+**Location:** `frontend/src/lib/UserModal.svelte`
+
+**Features:**
+- **Detailed User Profiles**: Avatar, stats (play count, country, join date)
+- **Connected Services**: Visual indicators for Spotify/Last.fm connection status
+- **Top Artists List**: Ranked display of user's favorite artists
+- **Favorite Genres**: Tag-based genre display
+- **Compatibility Visualization**: Circular progress indicator with descriptive text
+- **Action Buttons**: Placeholder for future playlist exchange functionality
+- **Keyboard & Accessibility Support**: ESC key to close, proper focus management
+
+### Design System Implementation
+
+**Music-Themed Design Elements:**
+- Vinyl record and music note icons
+- Artist-focused information display
+- Genre tags styled like playlist labels
+- Compatibility scoring with music-themed descriptions
+
+**Responsive Grid System:**
+- Auto-fit grid: 3 columns (desktop) → 2 columns (tablet) → 1 column (mobile)
+- Card-based layout resembling "album covers" for users
+- Consistent spacing and visual hierarchy
+
+**Social Discovery Features:**
+- Compatibility preview with color coding:
+  - Red: <50% compatibility
+  - Yellow: 50-80% compatibility  
+  - Green: >80% compatibility
+- Top artists showcase for quick music taste assessment
+- Service connection status for exchange readiness
+- Expandable user profiles with detailed music data
+
+### Integration Requirements
+
+**API Endpoints Used:**
+```javascript
+GET /session/:code              // Fetch session details
+GET /session/:code/participants // Fetch participant list
+GET /user/:code/lastfm         // Get Last.fm data for users
+```
+
+**Expected Data Structure:**
+```javascript
+// Session object
+{
+  groupName: "My Music Group",
+  groupSize: 5,
+  sessionCode: "ABC123"
+}
+
+// Participant object
+{
+  name: "John Doe",
+  avatar: "https://...",
+  spotifyConnected: true,
+  lastfmConnected: false,
+  topArtists: ["Artist 1", "Artist 2"],
+  compatibilityScore: 85,
+  online: true
+}
+```
+
+**Navigation Usage:**
+```javascript
+// Navigate to participants page
+window.navigate('/session/ABC123/participants');
+
+// From Create.svelte after session creation
+setTimeout(() => {
+  window.navigate(`/session/${data.sessionCode}/participants`);
+}, 1500);
+```
+
+### Future Enhancements
+
+1. **WebSocket Integration**: Replace polling with real-time updates for participant joins/leaves
+2. **Profile Data**: Connect to Last.fm/Spotify APIs for real user data
+3. **Matching Algorithm**: Implement the compatibility scoring system
+4. **Playlist Exchange**: Add the core functionality once matching is complete
+
+---
+
+This instructions file reflects the current implementation state and provides comprehensive guidance for testing, API integration, and user interface development for The Playlist Exchange application. All major structural components are in place, with robust testing tools and detailed integration guides for continued development.

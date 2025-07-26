@@ -230,8 +230,7 @@
 
 <style>
   main {
-    height: 100vh;
-    max-height: 100vh;
+    min-height: 100vh;
     background-color: #ffff60;
     display: flex;
     flex-direction: column;

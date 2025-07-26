@@ -140,8 +140,7 @@
 
 <style>
   main {
-    height: 100vh;
-    max-height: 100vh;
+    min-height: 100vh;
     background-color: #ffff60;
     display: flex;
     flex-direction: column;
@@ -149,7 +148,7 @@
     justify-content: center;
     padding: 2rem;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
   }
 
   .attribution {

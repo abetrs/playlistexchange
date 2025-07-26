@@ -63,6 +63,60 @@
     return `${randomAdjective}_${randomNoun}_${randomNumber}`;
   }
 
+  // Validate Last.fm username by checking if user exists
+  async function validateLastfmUsername(username) {
+    try {
+      const response = await fetch(API_ENDPOINTS.LASTFM_USER(username));
+      return response.ok;
+    } catch (error) {
+      console.error("Error validating Last.fm username:", error);
+      return false;
+    }
+  }
+
+  // Check if user already exists in this session
+  async function checkExistingUser(sessionCode, userName, lastfmUsername) {
+    try {
+      const response = await fetch(
+        API_ENDPOINTS.SESSION_PARTICIPANTS(sessionCode)
+      );
+      if (!response.ok) return { type: "none", user: null };
+
+      const data = await response.json();
+      const participants = data.participants || [];
+
+      // Check for duplicate Last.fm username (takes priority)
+      for (const participant of participants) {
+        if (participant.lastfmUsername === lastfmUsername) {
+          return { type: "lastfm", user: participant };
+        }
+      }
+
+      // Check for duplicate display name
+      for (const participant of participants) {
+        if (participant.name === userName) {
+          return { type: "name", user: participant };
+        }
+      }
+
+      return { type: "none", user: null };
+    } catch (error) {
+      console.error("Error checking existing users:", error);
+      return { type: "none", user: null };
+    }
+  }
+
+  // Store session info in localStorage
+  function storeSessionInfo(sessionCode, userName, sessionName) {
+    const sessionInfo = {
+      sessionCode,
+      userName,
+      sessionName,
+      joinedAt: new Date().toISOString(),
+    };
+    localStorage.setItem("lastJoinedSession", JSON.stringify(sessionInfo));
+  }
+
   async function connectLastfm() {
     if (!userName.trim()) {
       errorMessage = "Please enter your name first";
@@ -94,6 +148,41 @@
       }
 
       const sessionData = await sessionResponse.json();
+
+      // Validate Last.fm username
+      const isValidLastfm = await validateLastfmUsername(lastfmUsername.trim());
+      if (!isValidLastfm) {
+        errorMessage =
+          "Invalid Last.fm username. Please enter a valid Last.fm username.";
+        return;
+      }
+
+      // Check if user already exists in this session
+      const existingUserCheck = await checkExistingUser(
+        joinCode.trim(),
+        userName.trim(),
+        lastfmUsername.trim()
+      );
+
+      if (existingUserCheck.type === "name") {
+        errorMessage =
+          "Username already exists. Please choose a different name.";
+        return;
+      }
+
+      if (existingUserCheck.type === "lastfm") {
+        // Store session info and redirect to existing session (same Last.fm user)
+        storeSessionInfo(
+          joinCode.trim(),
+          existingUserCheck.user.name,
+          sessionData.name
+        );
+        alert(
+          `Logging you in as existing user: ${existingUserCheck.user.name}`
+        );
+        window.navigate(`/participants/${joinCode.trim()}`);
+        return;
+      }
 
       // Create a new user with the provided data and Last.fm username
       const createUserResponse = await fetch(API_ENDPOINTS.USERS, {
@@ -146,6 +235,9 @@
         }
         return;
       }
+
+      // Store session info in localStorage for future rejoining
+      storeSessionInfo(joinCode.trim(), userName.trim(), sessionData.name);
 
       // Clear any stored session data since we've successfully joined
       sessionStorage.removeItem("sessionCode");
@@ -245,8 +337,7 @@
 
 <style>
   main {
-    height: 100vh;
-    max-height: 100vh;
+    min-height: 100vh;
     background-color: #ffff60;
     display: flex;
     flex-direction: column;
@@ -254,7 +345,7 @@
     justify-content: center;
     padding: 2rem;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
   }
 
   .attribution {

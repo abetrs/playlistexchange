@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
   // Last.fm endpoints
   LASTFM_TOP_ARTISTS: (user) =>
     `${CONFIG.BACKEND_URL}/lastfm/top-artists/${user}`,
+  LASTFM_USER: (user) => `${CONFIG.BACKEND_URL}/lastfm/user/${user}`,
   LASTFM_AUTH: `${CONFIG.BACKEND_URL}/auth/lastfm`,
   LASTFM_CALLBACK: `${CONFIG.BACKEND_URL}/auth/lastfm/callback`,
 };
