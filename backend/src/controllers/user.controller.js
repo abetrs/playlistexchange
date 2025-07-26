@@ -1,6 +1,7 @@
 const { db } = require("../firebase");
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
+const lastfmService = require("../services/lastfm.service");
 
 // Create a new user
 const createUser = async (req, res) => {
@@ -168,6 +169,233 @@ const getUserByLastfmUsername = async (req, res) => {
   }
 };
 
+// Get user's Last.fm profile data by user code
+const getUserLastfmProfile = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { dataType = "artists", period = "overall", limit = 10 } = req.query;
+
+    // Get user from database
+    const userDoc = await db.collection("users").doc(code).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = userDoc.data();
+
+    if (!user.lastfmUsername) {
+      return res.status(400).json({
+        message: "User has no Last.fm username configured",
+        error: "no_lastfm_username",
+      });
+    }
+
+    let lastfmData;
+    try {
+      // Fetch data from Last.fm based on type
+      switch (dataType) {
+        case "artists":
+          lastfmData = await lastfmService.getTopArtists(
+            user.lastfmUsername,
+            period,
+            parseInt(limit)
+          );
+          break;
+        case "albums":
+          lastfmData = await lastfmService.getTopAlbums(
+            user.lastfmUsername,
+            period,
+            parseInt(limit)
+          );
+          break;
+        case "tracks":
+          lastfmData = await lastfmService.getTopTracks(
+            user.lastfmUsername,
+            period,
+            parseInt(limit)
+          );
+          break;
+        case "info":
+          lastfmData = await lastfmService.getUserInfo(user.lastfmUsername);
+          break;
+        default:
+          return res.status(400).json({
+            message: "Invalid data type. Use: artists, albums, tracks, or info",
+            error: "invalid_data_type",
+          });
+      }
+
+      res.status(200).json({
+        user: {
+          code: user.code,
+          name: user.name,
+          lastfmUsername: user.lastfmUsername,
+        },
+        dataType,
+        period: dataType !== "info" ? period : undefined,
+        limit: dataType !== "info" ? parseInt(limit) : undefined,
+        lastfmData,
+      });
+    } catch (lastfmError) {
+      console.error("Error fetching Last.fm data:", lastfmError.message);
+
+      if (lastfmError.message.includes("not found")) {
+        return res.status(404).json({
+          message: "Last.fm user not found",
+          error: "lastfm_user_not_found",
+          user: {
+            code: user.code,
+            name: user.name,
+            lastfmUsername: user.lastfmUsername,
+          },
+        });
+      }
+
+      return res.status(500).json({
+        message: "Error fetching Last.fm data",
+        error: "lastfm_api_error",
+        details: lastfmError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting user Last.fm profile:", error);
+    res.status(500).json({ message: "Failed to get user Last.fm profile." });
+  }
+};
+
+// Get Last.fm profile data for all participants in a session
+const getSessionLastfmProfiles = async (req, res) => {
+  try {
+    const { sessionCode } = req.params;
+    const { dataType = "artists", period = "overall", limit = 5 } = req.query;
+
+    // Get session from database
+    const sessionDoc = await db.collection("sessions").doc(sessionCode).get();
+
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const session = sessionDoc.data();
+    const participants = session.participants || [];
+
+    if (participants.length === 0) {
+      return res.status(200).json({
+        session: {
+          code: session.code,
+          name: session.name,
+        },
+        participants: [],
+        dataType,
+        period: dataType !== "info" ? period : undefined,
+        limit: dataType !== "info" ? parseInt(limit) : undefined,
+      });
+    }
+
+    // Fetch Last.fm data for each participant
+    const participantProfiles = await Promise.allSettled(
+      participants.map(async (participant) => {
+        if (!participant.lastfmUsername) {
+          return {
+            user: {
+              code: participant.userCode,
+              name: participant.name,
+              lastfmUsername: null,
+            },
+            error: "no_lastfm_username",
+            lastfmData: null,
+          };
+        }
+
+        try {
+          let lastfmData;
+          switch (dataType) {
+            case "artists":
+              lastfmData = await lastfmService.getTopArtists(
+                participant.lastfmUsername,
+                period,
+                parseInt(limit)
+              );
+              break;
+            case "albums":
+              lastfmData = await lastfmService.getTopAlbums(
+                participant.lastfmUsername,
+                period,
+                parseInt(limit)
+              );
+              break;
+            case "tracks":
+              lastfmData = await lastfmService.getTopTracks(
+                participant.lastfmUsername,
+                period,
+                parseInt(limit)
+              );
+              break;
+            case "info":
+              lastfmData = await lastfmService.getUserInfo(
+                participant.lastfmUsername
+              );
+              break;
+            default:
+              throw new Error("Invalid data type");
+          }
+
+          return {
+            user: {
+              code: participant.userCode,
+              name: participant.name,
+              lastfmUsername: participant.lastfmUsername,
+            },
+            lastfmData,
+          };
+        } catch (lastfmError) {
+          return {
+            user: {
+              code: participant.userCode,
+              name: participant.name,
+              lastfmUsername: participant.lastfmUsername,
+            },
+            error: lastfmError.message.includes("not found")
+              ? "lastfm_user_not_found"
+              : "lastfm_api_error",
+            lastfmData: null,
+          };
+        }
+      })
+    );
+
+    // Process results
+    const results = participantProfiles.map((result) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      } else {
+        return {
+          user: { code: "unknown", name: "unknown", lastfmUsername: null },
+          error: "processing_error",
+          lastfmData: null,
+        };
+      }
+    });
+
+    res.status(200).json({
+      session: {
+        code: session.code,
+        name: session.name,
+      },
+      participants: results,
+      dataType,
+      period: dataType !== "info" ? period : undefined,
+      limit: dataType !== "info" ? parseInt(limit) : undefined,
+    });
+  } catch (error) {
+    console.error("Error getting session Last.fm profiles:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to get session Last.fm profiles." });
+  }
+};
+
 module.exports = {
   createUser,
   getUserByCode,
@@ -175,4 +403,6 @@ module.exports = {
   deleteUser,
   getAllUsers,
   getUserByLastfmUsername,
+  getUserLastfmProfile,
+  getSessionLastfmProfiles,
 };
