@@ -8,7 +8,10 @@
     "test-routes": "node test-all-routes.js",
     "start": "node src/index.js",
     "api-test": "node api-tester.js",
-    "api-test-demo": "node demo-api-tester.js"
+    "api-test-demo": "node demo-api-tester.js",
+    "test-taste-profiles": "node taste-profile-test.js",
+    "test-taste-workflow": "node taste-profile-test.js workflow",
+    "test-taste-errors": "node taste-profile-test.js errors"
   },
   "keywords": [],
   "author": "",

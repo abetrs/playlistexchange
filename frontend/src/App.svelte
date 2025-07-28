@@ -3,6 +3,7 @@
   import Create from "./routes/Create.svelte";
   import Join from "./routes/Join.svelte";
   import Participants from "./routes/Participants.svelte";
+  import Results from "./routes/Results.svelte";
 
   let currentPath = $state(window.location.pathname);
 
@@ -34,6 +35,8 @@
   <Join params={{ code: currentPath.split("/")[2] }} />
 {:else if currentPath.startsWith("/participants/")}
   <Participants params={{ code: currentPath.split("/")[2] }} />
+{:else if currentPath.startsWith("/results/")}
+  <Results params={{ code: currentPath.split("/")[2] }} />
 {:else}
   <Home />
 {/if}

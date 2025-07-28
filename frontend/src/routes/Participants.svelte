@@ -15,6 +15,7 @@
   let showModal = false;
   let modalMessage = "";
   let modalType = "success"; // "success" or "error"
+  let isMatching = false;
 
   onMount(async () => {
     // Get session code from params
@@ -134,6 +135,68 @@
       showModal = false;
     }, 5000);
   }
+
+  async function startMatching() {
+    if (participants.length < 2) {
+      showErrorModal("Need at least 2 participants to start matching");
+      return;
+    }
+
+    isMatching = true;
+
+    try {
+      // First, build taste profiles for all participants
+      showSuccessModal("Building taste profiles...");
+
+      const profilesResponse = await fetch(
+        API_ENDPOINTS.BUILD_SESSION_TASTE_PROFILES(sessionCode),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!profilesResponse.ok) {
+        const errorData = await profilesResponse.json();
+        throw new Error(errorData.message || "Failed to build taste profiles");
+      }
+
+      // Then compute matches
+      showSuccessModal("Computing matches...");
+
+      const matchResponse = await fetch(
+        API_ENDPOINTS.COMPUTE_SESSION_MATCHES(sessionCode),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!matchResponse.ok) {
+        const errorData = await matchResponse.json();
+        throw new Error(errorData.message || "Failed to compute matches");
+      }
+
+      const matchData = await matchResponse.json();
+      console.log("Matches computed:", matchData);
+
+      showSuccessModal("Matching complete! Redirecting to results...");
+
+      // Navigate to results page after a short delay
+      setTimeout(() => {
+        window.navigate(`/results/${sessionCode}`);
+      }, 2000);
+    } catch (error) {
+      console.error("Error starting matching:", error);
+      showErrorModal(`Failed to start matching: ${error.message}`);
+    } finally {
+      isMatching = false;
+    }
+  }
 </script>
 
 <main>
@@ -211,8 +274,12 @@
         <button class="share-button" on:click={shareSessionCode}>
           Share Session Code
         </button>
-        <button class="start-button" disabled={participants.length < 2}>
-          Start Exchange
+        <button
+          class="start-button"
+          disabled={participants.length < 2 || isMatching}
+          on:click={startMatching}
+        >
+          {isMatching ? "Processing..." : "Start Matching"}
         </button>
       </div>
     {/if}

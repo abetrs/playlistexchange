@@ -15,6 +15,18 @@ router.get(
   userController.getSessionLastfmProfiles
 ); // GET /user/session/:sessionCode/lastfm
 
+// Taste profile routes (must come before general :code routes)
+router.post("/:code/taste-profile", userController.buildUserTasteProfile); // POST /user/:code/taste-profile
+router.get("/:code/taste-profile", userController.getUserTasteProfile); // GET /user/:code/taste-profile
+router.get(
+  "/:codeA/compatibility/:codeB",
+  userController.calculateUserCompatibility
+); // GET /user/:codeA/compatibility/:codeB
+router.post(
+  "/session/:sessionCode/taste-profiles",
+  userController.buildSessionTasteProfiles
+); // POST /user/session/:sessionCode/taste-profiles
+
 // Standard user routes
 router.get("/:code", userController.getUserByCode); // GET /user/:code
 router.put("/:code", userController.updateUser); // PUT /user/:code

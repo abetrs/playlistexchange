@@ -8,4 +8,8 @@ router.get("/:code", sessionController.getSession);
 router.get("/:code/participants", sessionController.getSessionParticipants);
 router.post("/:code/join", sessionController.joinSession);
 
+// New matching endpoints
+router.post("/:code/match", sessionController.computeSessionMatches);
+router.get("/:code/matches", sessionController.getSessionMatches);
+
 module.exports = router;

@@ -2,6 +2,7 @@ const { db } = require("../firebase");
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
 const lastfmService = require("../services/lastfm.service");
+const matchingService = require("../services/matching.service");
 
 // Create a new user
 const createUser = async (req, res) => {
@@ -396,6 +397,234 @@ const getSessionLastfmProfiles = async (req, res) => {
   }
 };
 
+// Build and store taste profile for a user
+const buildUserTasteProfile = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { forceRefresh = false } = req.query;
+
+    console.log(
+      `Building taste profile for user ${code}, forceRefresh: ${forceRefresh}`
+    );
+
+    // Check for cached profile first (unless force refresh)
+    if (!forceRefresh) {
+      const cachedProfile = await matchingService.getCachedTasteProfile(code);
+      if (cachedProfile) {
+        return res.status(200).json({
+          message: "Taste profile retrieved from cache",
+          profile: cachedProfile,
+          cached: true,
+        });
+      }
+    }
+
+    // Build new taste profile
+    const profile = await matchingService.buildTasteProfile(code);
+
+    // Store the profile in Firestore
+    await matchingService.storeTasteProfile(code, profile);
+
+    res.status(200).json({
+      message: "Taste profile built and stored successfully",
+      profile: profile,
+      cached: false,
+    });
+  } catch (error) {
+    console.error("Error building user taste profile:", error);
+
+    if (error.message.includes("User not found")) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (error.message.includes("No Last.fm data")) {
+      return res.status(400).json({
+        message:
+          "Cannot build taste profile: No Last.fm username configured for user",
+        error: "no_lastfm_data",
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to build taste profile",
+      error: error.message,
+    });
+  }
+};
+
+// Get taste profile for a user
+const getUserTasteProfile = async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    // Try to get cached profile first
+    const cachedProfile = await matchingService.getCachedTasteProfile(code);
+
+    if (cachedProfile) {
+      return res.status(200).json({
+        message: "Taste profile retrieved",
+        profile: cachedProfile,
+        cached: true,
+      });
+    }
+
+    // No cached profile available
+    res.status(404).json({
+      message: "No taste profile found for user. Build profile first.",
+      suggestion: `POST /user/${code}/taste-profile to build profile`,
+    });
+  } catch (error) {
+    console.error("Error getting user taste profile:", error);
+
+    if (error.message.includes("User not found")) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(500).json({
+      message: "Failed to get taste profile",
+      error: error.message,
+    });
+  }
+};
+
+// Calculate compatibility between two users
+const calculateUserCompatibility = async (req, res) => {
+  try {
+    const { codeA, codeB } = req.params;
+
+    console.log(
+      `Calculating compatibility between users ${codeA} and ${codeB}`
+    );
+
+    // Get taste profiles for both users
+    const profileA = await matchingService.getCachedTasteProfile(codeA);
+    const profileB = await matchingService.getCachedTasteProfile(codeB);
+
+    if (!profileA) {
+      return res.status(400).json({
+        message: `No taste profile found for user ${codeA}. Build profile first.`,
+        missingProfile: codeA,
+      });
+    }
+
+    if (!profileB) {
+      return res.status(400).json({
+        message: `No taste profile found for user ${codeB}. Build profile first.`,
+        missingProfile: codeB,
+      });
+    }
+
+    // Calculate compatibility
+    const compatibility = matchingService.calculateCompatibility(
+      profileA,
+      profileB
+    );
+
+    res.status(200).json({
+      message: "Compatibility calculated successfully",
+      compatibility: compatibility,
+    });
+  } catch (error) {
+    console.error("Error calculating user compatibility:", error);
+
+    if (error.message.includes("User not found")) {
+      return res.status(404).json({ message: "One or both users not found" });
+    }
+
+    res.status(500).json({
+      message: "Failed to calculate compatibility",
+      error: error.message,
+    });
+  }
+};
+
+// Build taste profiles for all users in a session
+const buildSessionTasteProfiles = async (req, res) => {
+  try {
+    const { sessionCode } = req.params;
+    const { forceRefresh = false } = req.query;
+
+    console.log(
+      `Building taste profiles for session ${sessionCode}, forceRefresh: ${forceRefresh}`
+    );
+
+    // Get session participants
+    const sessionDoc = await db.collection("sessions").doc(sessionCode).get();
+
+    if (!sessionDoc.exists) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const session = sessionDoc.data();
+    const participantCodes = session.participants || [];
+
+    if (participantCodes.length === 0) {
+      return res.status(400).json({ message: "No participants in session" });
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Build profile for each participant
+    for (const userCode of participantCodes) {
+      try {
+        let profile;
+
+        // Check for cached profile first (unless force refresh)
+        if (!forceRefresh) {
+          profile = await matchingService.getCachedTasteProfile(userCode);
+        }
+
+        if (!profile) {
+          // Build new profile
+          profile = await matchingService.buildTasteProfile(userCode);
+          await matchingService.storeTasteProfile(userCode, profile);
+        }
+
+        results.push({
+          userCode,
+          userName: profile.userName,
+          success: true,
+          profileMetadata: profile.metadata,
+          cached: !forceRefresh && profile.metadata,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to build profile for user ${userCode}:`,
+          error.message
+        );
+        errors.push({
+          userCode,
+          error: error.message,
+          success: false,
+        });
+      }
+    }
+
+    res.status(200).json({
+      message: "Session taste profiles processing completed",
+      session: {
+        code: sessionCode,
+        name: session.name,
+        participantCount: participantCodes.length,
+      },
+      results: results,
+      errors: errors,
+      summary: {
+        successful: results.length,
+        failed: errors.length,
+        total: participantCodes.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error building session taste profiles:", error);
+    res.status(500).json({
+      message: "Failed to build session taste profiles",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createUser,
   getUserByCode,
@@ -405,4 +634,8 @@ module.exports = {
   getUserByLastfmUsername,
   getUserLastfmProfile,
   getSessionLastfmProfiles,
+  buildUserTasteProfile,
+  getUserTasteProfile,
+  calculateUserCompatibility,
+  buildSessionTasteProfiles,
 };

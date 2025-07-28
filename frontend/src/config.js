@@ -13,10 +13,26 @@ export const API_ENDPOINTS = {
     `${CONFIG.BACKEND_URL}/session/${code}/participants`,
   JOIN_SESSION: (code) => `${CONFIG.BACKEND_URL}/session/${code}/join`,
 
+  // Session matching endpoints
+  COMPUTE_SESSION_MATCHES: (code) =>
+    `${CONFIG.BACKEND_URL}/session/${code}/match`,
+  GET_SESSION_MATCHES: (code) =>
+    `${CONFIG.BACKEND_URL}/session/${code}/matches`,
+
   // User endpoints
   USERS: `${CONFIG.BACKEND_URL}/user`,
   USER_BY_CODE: (code) => `${CONFIG.BACKEND_URL}/user/${code}`,
   USER_BY_LASTFM: (username) => `${CONFIG.BACKEND_URL}/user/lastfm/${username}`,
+
+  // User taste profile endpoints
+  BUILD_USER_TASTE_PROFILE: (code) =>
+    `${CONFIG.BACKEND_URL}/user/${code}/taste-profile`,
+  GET_USER_TASTE_PROFILE: (code) =>
+    `${CONFIG.BACKEND_URL}/user/${code}/taste-profile`,
+  CALCULATE_USER_COMPATIBILITY: (codeA, codeB) =>
+    `${CONFIG.BACKEND_URL}/user/${codeA}/compatibility/${codeB}`,
+  BUILD_SESSION_TASTE_PROFILES: (sessionCode) =>
+    `${CONFIG.BACKEND_URL}/user/session/${sessionCode}/taste-profiles`,
 
   // Health endpoint
   HEALTH: `${CONFIG.BACKEND_URL}/health`,

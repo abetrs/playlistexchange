@@ -1,6 +1,7 @@
 const { db } = require("../firebase"); // Import your Firestore instance
 const { v4: uuidv4 } = require("uuid"); // A better way to get unique IDs
 const admin = require("firebase-admin");
+const matchingService = require("../services/matching.service");
 
 const createSession = async (req, res) => {
   try {
@@ -233,9 +234,78 @@ const getSessionParticipants = async (req, res) => {
   }
 };
 
+// Compute matches for session participants
+const computeSessionMatches = async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    console.log(`Starting match computation for session ${code}`);
+
+    const result = await matchingService.computeMatches(code);
+
+    res.status(200).json({
+      message: "Session matches computed successfully",
+      sessionCode: code,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Error computing session matches:", error);
+
+    if (error.message.includes("Session not found")) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    if (error.message.includes("Need at least 2 users")) {
+      return res.status(400).json({
+        message: "Need at least 2 participants to compute matches",
+      });
+    }
+
+    if (error.message.includes("Not enough profiles")) {
+      return res.status(400).json({
+        message:
+          "Not enough taste profiles available. Ensure participants have Last.fm usernames and profiles built.",
+        error: "insufficient_profiles",
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to compute session matches",
+      error: error.message,
+    });
+  }
+};
+
+// Get matches for a session
+const getSessionMatches = async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const result = await matchingService.getSessionMatches(code);
+
+    res.status(200).json({
+      sessionCode: code,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Error getting session matches:", error);
+
+    if (error.message.includes("Session not found")) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.status(500).json({
+      message: "Failed to get session matches",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createSession,
   joinSession,
   getSession,
   getSessionParticipants,
+  computeSessionMatches,
+  getSessionMatches,
 };
