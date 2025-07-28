@@ -8,7 +8,7 @@
   let sessionCode = "";
   let sessionData = null;
   let matches = [];
-  let isLoading = true;
+  let isLoading = false;
   let errorMessage = "";
   let showModal = false;
   let modalMessage = "";
@@ -261,14 +261,12 @@
       {modalMessage}
     </div>
   {/if}
-
-  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
   main {
     min-height: 100vh;
-    background-color: #ffff60;
+    background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -276,16 +274,6 @@
     padding: 2rem;
     position: relative;
     overflow-y: auto;
-  }
-
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
   }
 
   .results-container {
@@ -632,10 +620,6 @@
 
   /* Responsive design */
   @media (max-width: 768px) {
-    .attribution {
-      font-size: 16pt;
-    }
-
     .results-container {
       padding: 1.5rem;
       width: 95%;

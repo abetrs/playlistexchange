@@ -34,7 +34,7 @@
         },
         body: JSON.stringify({
           groupName: groupName.trim(),
-          groupSize: parseInt(groupSize),
+          groupSize: groupSize,
         }),
       });
 
@@ -79,7 +79,6 @@
     <div class="form-section">
       <div class="input-group">
         <label for="group-name">Group Name</label>
-        <span class="arrow">→</span>
         <input
           id="group-name"
           type="text"
@@ -92,7 +91,6 @@
 
       <div class="slider-group">
         <label for="group-size">Size</label>
-        <span class="arrow">→</span>
         <input
           id="group-size"
           type="range"
@@ -134,14 +132,12 @@
       </button>
     </div>
   </div>
-
-  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
   main {
     min-height: 100vh;
-    background-color: #ffff60;
+    background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -151,16 +147,6 @@
     overflow-y: auto;
   }
 
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
-  }
-
   .create-menu {
     background-color: #e8e8d0;
     border: 3px solid #000;
@@ -168,39 +154,8 @@
     padding: 2rem;
     width: 85%;
     max-width: 500px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  }
-
-  .menu-title {
-    font-size: 22pt;
-    font-weight: 400;
-    color: #000;
-    margin: 0;
-    text-align: left;
-  }
-
-  .menu-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .back-button {
-    font-size: 18pt;
-    font-family: "Instrument Serif", serif;
-    padding: 0.5rem 1rem;
-    background-color: #d0d0b8;
-    color: #000;
-    border: 2px solid #000;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .back-button:hover {
-    background-color: #b8b8a0;
-    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    margin: 0 auto;
   }
 
   .form-section {
@@ -212,35 +167,29 @@
   .input-group,
   .slider-group {
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    position: relative;
   }
 
   label {
     font-size: 20pt;
     font-weight: 400;
     color: #000;
-    min-width: 120px;
     text-align: left;
   }
 
-  .arrow {
-    font-size: 20pt;
-    color: #000;
-    margin: 0 0.5rem;
-  }
-
   .group-name-input {
-    flex: 1;
     font-size: 18pt;
     font-family: "Instrument Serif", serif;
-    padding: 0.6rem 0.8rem;
-    border: 2px solid #000;
-    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    border: 3px solid #000;
+    border-radius: 10px;
     background-color: #f5f5f5;
     color: #000;
     outline: none;
     transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .group-name-input:focus {
@@ -249,104 +198,81 @@
     box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.1);
   }
 
-  .group-name-input::placeholder {
-    color: #888;
+  .slider-group {
+    position: relative;
+  }
+
+  .slider-group::after {
+    content: "Adjust the number of participants";
+    position: absolute;
+    bottom: -25px;
+    left: 0;
+    font-size: 12pt;
+    color: #666;
     font-style: italic;
   }
 
   .size-slider {
-    flex: 1;
-    height: 8px;
-    background: #ddd;
-    border-radius: 5px;
+    width: 100%;
+    height: 12px;
+    background: linear-gradient(90deg, #ddd 0%, #a020f0 100%);
+    border-radius: 6px;
     outline: none;
     appearance: none;
     cursor: pointer;
     transition: background 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .size-slider::-webkit-slider-thumb {
     appearance: none;
-    width: 24px;
-    height: 24px;
-    background: #fff;
-    border: 2px solid #000;
+    width: 28px;
+    height: 28px;
+    background: #a020f0;
+    border: 3px solid #fff;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 6px rgba(160, 32, 240, 0.3);
   }
 
   .size-slider::-webkit-slider-thumb:hover {
-    background: #f0f0f0;
+    background: #8a1ad6;
     transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(160, 32, 240, 0.4);
   }
 
   .size-slider::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    background: #fff;
-    border: 2px solid #000;
+    width: 28px;
+    height: 28px;
+    background: #a020f0;
+    border: 3px solid #fff;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .size-slider::-moz-range-thumb:hover {
-    background: #f0f0f0;
-    transform: scale(1.1);
-  }
-
-  .user-count {
-    font-size: 2.5em;
-    font-weight: 400;
-    color: #000;
-    text-align: center;
-    margin-top: 0.5rem;
-    line-height: 1.1;
-  }
-
-  .message {
-    padding: 0.8rem;
-    border-radius: 8px;
-    font-size: 14pt;
-    text-align: center;
-    margin: 0.8rem 0;
-    border: 2px solid;
-  }
-
-  .error-message {
-    background-color: #ffe6e6;
-    border-color: #ff4444;
-    color: #cc0000;
-  }
-
-  .success-message {
-    background-color: #e6ffe6;
-    border-color: #44ff44;
-    color: #006600;
+    box-shadow: 0 3px 6px rgba(160, 32, 240, 0.3);
   }
 
   .create-button {
     font-size: 18pt;
     font-family: "Instrument Serif", serif;
     font-weight: 400;
-    padding: 0.8rem 1.5rem;
+    padding: 1rem 1.5rem;
     background-color: #d0d0b8;
     color: #000;
     border: 3px solid #000;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    margin-top: 0.8rem;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
     width: 100%;
     text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 
   .create-button:hover:not(:disabled) {
     background-color: #b8b8a0;
-    transform: translateY(-2px);
+    transform: scale(1.05);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
   }
 

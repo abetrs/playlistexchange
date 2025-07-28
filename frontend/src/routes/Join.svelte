@@ -331,8 +331,6 @@
       </div>
     </div>
   </div>
-
-  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
@@ -346,16 +344,6 @@
     padding: 2rem;
     position: relative;
     overflow-y: auto;
-  }
-
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
   }
 
   .join-menu {
@@ -390,14 +378,6 @@
   .back-button:hover {
     background-color: #b8b8a0;
     transform: translateY(-1px);
-  }
-
-  .menu-title {
-    font-size: 24pt;
-    font-weight: 400;
-    color: #000;
-    margin: 0;
-    text-align: left;
   }
 
   .form-section {

@@ -291,14 +291,12 @@
       {modalMessage}
     </div>
   {/if}
-
-  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
   main {
     min-height: 100vh;
-    background-color: #ffff60;
+    background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -306,16 +304,6 @@
     padding: 2rem;
     position: relative;
     overflow-y: auto;
-  }
-
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
   }
 
   .participants-container {
@@ -399,30 +387,56 @@
 
   .participants-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: 1fr;
     gap: 1.5rem;
     margin-bottom: 2rem;
+    animation: fadeInGrid 0.6s ease-out;
+  }
+
+  @keyframes fadeInGrid {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .participant-card {
     background-color: #f5f5f5;
-    border: 2px solid #000;
-    border-radius: 12px;
+    border: 3px solid #000;
+    border-radius: 15px;
     padding: 1.5rem;
     display: flex;
     align-items: center;
     gap: 1rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    animation: fadeInCard 0.6s ease-out;
+  }
+
+  @keyframes fadeInCard {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .participant-card:hover:not(.empty) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
   }
 
   .participant-card.empty {
     background-color: #e8e8e8;
     border-style: dashed;
+    border-color: #999;
     opacity: 0.7;
   }
 
@@ -551,11 +565,62 @@
   }
 
   /* Responsive design */
-  @media (max-width: 768px) {
-    .attribution {
-      font-size: 16pt;
+  @media (min-width: 481px) and (max-width: 768px) {
+    .participants-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 769px) {
+    .participants-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .participants-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .participants-container {
+      padding: 1rem;
+      width: 95%;
+      margin-top: 2rem;
     }
 
+    .session-title {
+      font-size: 18pt;
+    }
+
+    .participants-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .participant-card {
+      padding: 1rem;
+    }
+
+    .session-info {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .session-actions {
+      flex-direction: column;
+    }
+
+    .share-button,
+    .start-button {
+      font-size: 14pt;
+      padding: 0.8rem 1.5rem;
+    }
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
     .participants-container {
       padding: 1.5rem;
       width: 95%;
@@ -564,11 +629,6 @@
 
     .session-title {
       font-size: 22pt;
-    }
-
-    .participants-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
     }
 
     .session-info {
@@ -588,77 +648,113 @@
     }
   }
 
-  @media (max-width: 480px) {
-    .participants-container {
-      padding: 1rem;
-    }
+  .participant-avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 20pt;
+  }
 
-    .session-title {
-      font-size: 18pt;
-    }
+  .participant-name {
+    font-size: 16pt;
+  }
 
-    .participant-card {
-      padding: 1rem;
-    }
-
-    .participant-avatar {
-      width: 50px;
-      height: 50px;
-      font-size: 20pt;
-    }
-
-    .participant-name {
-      font-size: 16pt;
-    }
-
-    .share-button,
-    .start-button {
-      font-size: 14pt;
-      padding: 0.6rem 1rem;
-    }
+  .share-button,
+  .start-button {
+    font-size: 14pt;
+    padding: 0.6rem 1rem;
   }
 
   .modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    top: 20px;
+    right: 20px;
     background-color: #f5f5f5;
-    border: 2px solid #000;
-    border-radius: 8px;
-    padding: 1rem 1.5rem;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
     font-size: 16pt;
     font-family: "Instrument Serif", serif;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     z-index: 1000;
-    animation: fadeInOut 5s ease-in-out;
+    animation: slideInOut 5s ease-in-out;
+    max-width: 300px;
+    transform: translateX(100%);
   }
 
   .modal.success {
     background-color: #e6ffe6;
     border-color: #44aa44;
     color: #006600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modal.success::before {
+    content: "✓";
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-color: #44aa44;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-weight: bold;
+    animation: checkmarkPop 0.6s ease-out;
+    flex-shrink: 0;
+  }
+
+  @keyframes checkmarkPop {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   .modal.error {
     background-color: #ffe6e6;
     border-color: #aa4444;
     color: #cc0000;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
-  @keyframes fadeInOut {
+  .modal.error::before {
+    content: "⚠";
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-color: #aa4444;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  @keyframes slideInOut {
     0% {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.9);
+      transform: translateX(100%);
     }
     10%,
     90% {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: translateX(0);
     }
     100% {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.9);
+      transform: translateX(100%);
     }
   }
 </style>

@@ -7,7 +7,7 @@
 
   color-scheme: light;
   color: #000;
-  background-color: #FFFF60;
+  background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -28,15 +28,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
+  background-attachment: fixed;
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-size: 24pt;
+  line-height: 1.5;
+}
+
+h2 {
+  font-size: 24pt;
+  line-height: 1.5;
+}
+
+p, span, label, input, button {
+  font-size: 14pt;
+  line-height: 1.5;
 }
 
 .card {
   padding: 2em;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 #app {
@@ -45,23 +58,49 @@ h1 {
   margin: 0;
   padding: 0;
   overflow-y: auto;
+  background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
+  background-attachment: fixed;
 }
 
 button {
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
-  font-size: 1em;
+  font-size: 14pt;
   font-weight: 500;
   font-family: inherit;
   background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 button:hover {
   border-color: #646cff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 480px) {
+  h1, h2 {
+    font-size: 20pt;
+  }
+  
+  p, span, label, input, button {
+    font-size: 12pt;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  h1, h2 {
+    font-size: 22pt;
+  }
+  
+  p, span, label, input, button {
+    font-size: 13pt;
+  }
 }

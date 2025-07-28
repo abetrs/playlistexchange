@@ -65,13 +65,12 @@
   {/if}
 
   <ActionsMenu bind:joinCode onJoin={handleJoin} onCreate={handleCreate} />
-  <div class="attribution">By ReallyAbe</div>
 </main>
 
 <style>
   main {
     min-height: 100vh;
-    background-color: #ffff60;
+    background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -80,16 +79,6 @@
     position: relative;
     overflow-y: auto;
     gap: 1.5rem;
-  }
-
-  .attribution {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    font-size: 20pt;
-    color: #000;
-    font-family: Helvetica, Arial, sans-serif;
-    font-weight: 400;
   }
 
   .rejoin-session {
@@ -173,10 +162,6 @@
 
   /* Responsive design */
   @media (max-width: 768px) {
-    .attribution {
-      font-size: 16pt;
-    }
-
     main {
       padding: 2rem;
     }
