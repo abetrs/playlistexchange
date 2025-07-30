@@ -107,11 +107,17 @@
   }
 
   // Store session info in localStorage
-  function storeSessionInfo(sessionCode, userName, sessionName) {
+  function storeSessionInfo(
+    sessionCode,
+    userName,
+    sessionName,
+    userCode = null
+  ) {
     const sessionInfo = {
       sessionCode,
       userName,
       sessionName,
+      userCode,
       joinedAt: new Date().toISOString(),
     };
     localStorage.setItem("lastJoinedSession", JSON.stringify(sessionInfo));
@@ -237,7 +243,12 @@
       }
 
       // Store session info in localStorage for future rejoining
-      storeSessionInfo(joinCode.trim(), userName.trim(), sessionData.name);
+      storeSessionInfo(
+        joinCode.trim(),
+        userName.trim(),
+        sessionData.name,
+        newUser.userCode
+      );
 
       // Clear any stored session data since we've successfully joined
       sessionStorage.removeItem("sessionCode");
