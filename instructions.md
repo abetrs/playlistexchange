@@ -46,10 +46,8 @@ This file will guide our collaboration in building "The Playlist Exchange" appli
 12. **Taste Profile Analysis:** Complete vectorized profile system using Last.fm data with cosine similarity
 13. **User Matching Algorithm:** Pairwise compatibility calculation with hybrid scoring system
 14. **Session Matching System:** Automated matching computation and results storage
-
-**Planned:**
-15. **Real-time Updates:** WebSocket support for live session updates
-16. **Results Display:** UI for showing matched participants and recommendations
+15. **Match Database System:** Separate matches collection for persistent match storage
+16. **Results Display:** Complete UI for showing detailed compatibility matches and user information
 
 ---
 
@@ -97,7 +95,8 @@ frontend/
 │   │   ├── Home.svelte          # Landing page
 │   │   ├── Create.svelte        # Session creation
 │   │   ├── Join.svelte          # Session joining with user creation
-│   │   └── Participants.svelte  # Session dashboard with participant management
+│   │   ├── Participants.svelte  # Session dashboard with participant management
+│   │   └── Results.svelte       # Match results display with compatibility scores
 │   ├── lib/                     # Reusable components
 │   │   ├── BrandContainer.svelte
 │   │   ├── ActionsMenu.svelte
@@ -139,12 +138,110 @@ frontend/
 - `GET /auth/lastfm` - Initiate Last.fm OAuth authentication
 - `GET /auth/lastfm/callback` - Handle Last.fm OAuth callback
 
+### Match Database System
+
+**Separate Matches Collection Implementation:**
+
+The application now uses a dedicated `matches` collection in Firestore to store computed match results separately from session documents, providing better data organization and avoiding document size limits.
+
+**Key Features:**
+
+- **Persistent Match Storage:** Match results are stored in a separate `matches` collection with proper document structure
+- **Backwards Compatibility:** Existing sessions with matches stored in session documents continue to work
+- **Avoid Re-computation:** Once matches are stored, users see "View Matches" instead of re-running the algorithm
+- **Re-run Capability:** Users can choose to re-run matches with updated data via "Re-run Matches" button
+- **Firestore Index Optimization:** Query implementation avoids composite index requirements by using JavaScript sorting
+
+**Database Schema:**
+
+```javascript
+// matches/{matchId}
+{
+  id: "auto-generated-match-id",
+  sessionCode: "ABC123",
+  matches: [
+    {
+      pair: ["userCode1", "userCode2"],
+      score: 0.85,
+      userA: { code: "userCode1", name: "User One" },
+      userB: { code: "userCode2", name: "User Two" },
+      details: {
+        artistScore: 0.82,
+        trackScore: 0.88,
+        commonArtists: 25,
+        commonTracks: 15,
+        topCommonArtists: ["Artist 1", "Artist 2"],
+        topCommonTracks: ["track1", "track2"]
+      }
+    }
+  ],
+  sessionInfo: {
+    code: "ABC123",
+    name: "Session Name",
+    participantCount: 4,
+    profilesLoaded: 4,
+    matchesGenerated: 6
+  },
+  errors: [],
+  createdAt: "2025-01-30T...",
+  updatedAt: "2025-01-30T..."
+}
+
+// sessions/{sessionCode} - Enhanced with match reference
+{
+  // ... existing session fields
+  currentMatchId: "match-document-id",
+  status: "matched",
+  matchingCompletedAt: "2025-01-30T..."
+}
+```
+
+**Backend Implementation:**
+
+```javascript
+// matching.service.js
+async function storeMatchData(sessionCode, matchData) {
+  const matchRef = db.collection("matches").doc();
+  const matchId = matchRef.id;
+  
+  const matchDocument = {
+    id: matchId,
+    sessionCode,
+    matches: matchData.matches,
+    sessionInfo: matchData.sessionInfo,
+    errors: matchData.errors || [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  
+  await matchRef.set(matchDocument);
+  return matchId;
+}
+
+async function getMatchData(sessionCode) {
+  const matchesQuery = db
+    .collection("matches")
+    .where("sessionCode", "==", sessionCode);
+  
+  const querySnapshot = await matchesQuery.get();
+  if (querySnapshot.empty) return null;
+  
+  // Sort by createdAt in JavaScript to avoid composite index
+  const matches = [];
+  querySnapshot.forEach((doc) => matches.push(doc.data()));
+  matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  
+  return matches[0]; // Return most recent match
+}
+```
+
 **Frontend Pages:**
 
 1. **Home Page** (`Home.svelte`) - Entry point with join/create options and session rejoin functionality
 2. **Create Page** (`Create.svelte`) - Session creation with group name and size selection
 3. **Join Page** (`Join.svelte`) - Join sessions with name and Last.fm username input
 4. **Participants Page** (`Participants.svelte`) - Dashboard showing session participants and status
+5. **Results Page** (`Results.svelte`) - Comprehensive match results display with compatibility analysis
 
 ### New Features Implemented
 
@@ -309,6 +406,7 @@ Routes:
 - `/join` - Join form (standalone)
 - `/join/{sessionCode}` - Join form with pre-filled session code
 - `/participants/{sessionCode}` - Session dashboard
+- `/results/{sessionCode}` - Match results display
 
 ### Required Backend Enhancements
 
@@ -345,29 +443,30 @@ Routes:
    - Complete Last.fm authentication integration
    - Connect frontend music service buttons to backend auth
 
-2. **Enhanced Frontend Integration:**
-   - Results page UI for displaying compatibility matches
-   - "Start Matching" button integration in Participants page
-   - Real-time progress indicators during profile building
-   - Match visualization with color-coded compatibility scores
-
-3. **Real-time Features:**
+2. **Real-time Features:**
    - WebSocket integration for live session updates
    - Real-time participant list updates
    - Session status broadcasting
    - Live matching progress updates
 
-4. **Advanced Matching Features:**
+3. **Advanced Matching Features:**
    - Spotify audio features integration (energy, valence, danceability)
    - Genre vector extraction using Last.fm tags
    - Temporal analysis for listening patterns over time
    - Diversity optimization to promote music discovery
 
-5. **Playlist Exchange Implementation:**
+4. **Playlist Exchange Implementation:**
    - Recommendation engine using compatibility data
    - Actual playlist sharing between matched participants
    - Exchange interface and workflow
    - Success metrics and feedback system
+
+**Recently Completed:**
+- ✅ Match Database System: Separate matches collection with persistent storage
+- ✅ Results Page: Complete UI for match visualization and analysis
+- ✅ Enhanced Participants Page: Conditional buttons based on match status
+- ✅ Firestore Optimization: Query implementation avoiding composite index requirements
+- ✅ UI Polish: Centered BrandContainer and responsive match display
 
 ---
 
@@ -1008,6 +1107,107 @@ Artist preferences are weighted more heavily than individual tracks for better c
 
 ---
 
+## 🎯 Results Page Implementation
+
+### Complete Match Results Display
+
+**Location:** `frontend/src/routes/Results.svelte`
+
+A comprehensive results page that displays computed compatibility matches with detailed analysis and user-friendly visualization.
+
+**Key Features:**
+
+**Match Visualization:**
+- Ranked match display with color-coded compatibility scores
+- Participant avatars and names for easy identification
+- Visual compatibility bars with percentage indicators
+- Descriptive compatibility labels (Exceptional Match, Great Match, etc.)
+
+**Detailed Analysis:**
+- Artist similarity breakdown with percentage scores
+- Track similarity analysis and common element counts
+- Top common artists and tracks display
+- Multiple compatibility metrics (cosine similarity, Jaccard index)
+
+**User Interface:**
+- Centered BrandContainer using `.brand-wrapper` styling
+- Responsive card-based layout for match information
+- Session information header with code and participant count
+- Back navigation to participants dashboard
+
+**Re-run Functionality:**
+- "Re-run Matches" button for updating results with fresh data
+- Progress feedback during re-computation
+- Automatic data refresh after successful re-run
+- Error handling with user-friendly messages
+
+**Data Handling:**
+- Fetches match data from separate matches collection
+- Backwards compatibility with legacy session-stored matches
+- Comprehensive error states and loading indicators
+- Modal feedback system for user actions
+
+**Design System Integration:**
+- Consistent typography using 'Instrument Serif' font
+- Yellow gradient background matching app theme
+- Card-based layout with black borders and rounded corners
+- Responsive design for mobile and tablet devices
+
+**Implementation Details:**
+
+```javascript
+// Route Integration
+{#if currentPath.startsWith("/results/")}
+  <Results params={{ code: currentPath.split("/")[2] }} />
+{/if}
+
+// Navigation Pattern
+function viewMatches() {
+  window.navigate(`/results/${sessionCode}`);
+}
+
+// API Integration
+const response = await fetch(API_ENDPOINTS.GET_SESSION_MATCHES(sessionCode));
+const matchData = await response.json();
+```
+
+**Styling Patterns:**
+
+```css
+.brand-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0 1rem 0;
+}
+
+.match-card {
+  background: #e8e8d0;
+  border: 2px solid #000;
+  border-radius: 20px;
+  padding: 2rem;
+  transition: transform 0.2s ease;
+}
+
+.compatibility-score {
+  font-size: 24pt;
+  font-weight: bold;
+  color: dynamic-color-based-on-score;
+}
+```
+
+**Compatibility Color Coding:**
+- Green (#4ade80): 80%+ compatibility
+- Yellow (#fbbf24): 50-80% compatibility  
+- Red (#f87171): Below 50% compatibility
+
+**Error Handling:**
+- Session not found scenarios
+- No matches available states
+- Network connection failures
+- Firestore query errors with fallback logic
+
+---
+
 ## 👥 Session Participants Page Implementation
 
 ### Complete Participants Dashboard
@@ -1045,7 +1245,10 @@ A comprehensive session dashboard that follows the established design system wit
 **Actions Menu:**
 - Refresh button for manual updates
 - Share session functionality with modal feedback
-- Start Exchange button (enabled when 2+ participants)
+- Conditional matching buttons based on match status:
+  - "Start Matching" - When no matches exist yet
+  - "View Matches" - When matches are available (navigates to Results page)
+  - "Re-run Matches" - Secondary option for updating existing matches
 
 ### User Modal Component
 

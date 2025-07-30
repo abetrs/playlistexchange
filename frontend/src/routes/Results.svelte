@@ -6,13 +6,13 @@
   export let params = {};
 
   let sessionCode = "";
-  let sessionData = null;
-  let matches = [];
-  let isLoading = false;
+  let matchData = null;
+  let isLoading = true;
   let errorMessage = "";
   let showModal = false;
   let modalMessage = "";
   let modalType = "success";
+  let isRerunning = false;
 
   onMount(async () => {
     // Get session code from params
@@ -25,36 +25,43 @@
     }
 
     if (sessionCode) {
-      await loadResults();
+      await loadMatchData();
     } else {
       errorMessage = "No session code provided";
       isLoading = false;
     }
   });
 
-  async function loadResults() {
+  async function loadMatchData() {
     try {
-      // Fetch session matches
-      const matchesResponse = await fetch(
+      const response = await fetch(
         API_ENDPOINTS.GET_SESSION_MATCHES(sessionCode)
       );
 
-      if (!matchesResponse.ok) {
-        const errorData = await matchesResponse.json();
-        throw new Error(errorData.message || "Failed to load matches");
+      if (!response.ok) {
+        if (response.status === 404) {
+          errorMessage = "Session not found";
+        } else {
+          errorMessage = "Failed to load match data";
+        }
+        return;
       }
 
-      const matchesData = await matchesResponse.json();
-      sessionData = matchesData.sessionInfo;
-      matches = matchesData.matches || [];
+      matchData = await response.json();
+      console.log("Match data received:", matchData); // Debug log
+      console.log("Has matches flag:", matchData.hasMatches); // Debug log
+      console.log("Matches array:", matchData.matches); // Debug log
+      console.log("Matches length:", matchData.matches?.length); // Debug log
 
-      if (matches.length === 0) {
-        errorMessage =
-          "No matches found. Make sure all participants have Last.fm profiles.";
+      if (
+        !matchData.hasMatches &&
+        (!matchData.matches || matchData.matches.length === 0)
+      ) {
+        errorMessage = "No matches available. Please run matching first.";
       }
     } catch (error) {
-      console.error("Error loading results:", error);
-      errorMessage = error.message || "Failed to load matching results";
+      console.error("Error loading match data:", error);
+      errorMessage = "Failed to load match data";
     } finally {
       isLoading = false;
     }
@@ -62,26 +69,6 @@
 
   function goBack() {
     window.navigate(`/participants/${sessionCode}`);
-  }
-
-  function goHome() {
-    window.navigate("/");
-  }
-
-  function getScoreColor(score) {
-    if (score >= 0.7) return "#4CAF50"; // Green for high compatibility
-    if (score >= 0.4) return "#FF9800"; // Orange for medium compatibility
-    return "#F44336"; // Red for low compatibility
-  }
-
-  function getScoreLabel(score) {
-    if (score >= 0.7) return "Excellent Match";
-    if (score >= 0.4) return "Good Match";
-    return "Different Tastes";
-  }
-
-  function formatScore(score) {
-    return Math.round(score * 100);
   }
 
   function getInitials(name) {
@@ -93,169 +80,256 @@
       .substring(0, 2);
   }
 
+  function getCompatibilityColor(score) {
+    if (score >= 0.8) return "#4ade80"; // Green
+    if (score >= 0.5) return "#fbbf24"; // Yellow
+    return "#f87171"; // Red
+  }
+
+  function getCompatibilityDescription(score) {
+    if (score >= 0.9) return "Exceptional Match";
+    if (score >= 0.8) return "Great Match";
+    if (score >= 0.7) return "Good Match";
+    if (score >= 0.5) return "Fair Match";
+    if (score >= 0.3) return "Some Compatibility";
+    return "Limited Compatibility";
+  }
+
+  function formatPercentage(score) {
+    return Math.round(score * 100);
+  }
+
   function showSuccessModal(message) {
     modalMessage = message;
     modalType = "success";
     showModal = true;
     setTimeout(() => {
       showModal = false;
-    }, 3000);
+    }, 5000);
   }
 
-  async function shareResults() {
-    const resultsUrl = `${window.location.origin}/results/${sessionCode}`;
+  function showErrorModal(message) {
+    modalMessage = message;
+    modalType = "error";
+    showModal = true;
+    setTimeout(() => {
+      showModal = false;
+    }, 5000);
+  }
+
+  async function rerunMatching() {
+    if (isRerunning) return;
+
+    isRerunning = true;
+    showSuccessModal("Re-running matches...");
 
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(resultsUrl);
-        showSuccessModal("Results link copied to clipboard!");
-      } else {
-        // Fallback for older browsers
-        const textArea = document.createElement("textarea");
-        textArea.value = resultsUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-        showSuccessModal("Results link copied to clipboard!");
+      // First, build taste profiles for all participants
+      const profilesResponse = await fetch(
+        API_ENDPOINTS.BUILD_SESSION_TASTE_PROFILES(sessionCode),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!profilesResponse.ok) {
+        const errorData = await profilesResponse.json();
+        throw new Error(errorData.message || "Failed to build taste profiles");
       }
+
+      // Then compute matches
+      const matchResponse = await fetch(
+        API_ENDPOINTS.COMPUTE_SESSION_MATCHES(sessionCode),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!matchResponse.ok) {
+        const errorData = await matchResponse.json();
+        throw new Error(errorData.message || "Failed to compute matches");
+      }
+
+      showSuccessModal("Matches updated successfully!");
+
+      // Reload the match data
+      await loadMatchData();
     } catch (error) {
-      console.error("Failed to copy to clipboard:", error);
+      console.error("Error rerunning matches:", error);
+      showErrorModal(`Failed to rerun matches: ${error.message}`);
+    } finally {
+      isRerunning = false;
     }
   }
 </script>
 
 <main>
-  <BrandContainer />
+  <div class="brand-wrapper">
+    <BrandContainer />
+  </div>
 
   <div class="results-container">
     <div class="menu-header">
       <button class="back-button" on:click={goBack}>← Back to Session</button>
-      {#if sessionData}
-        <h1 class="session-title">{sessionData.name} - Results</h1>
+      {#if matchData?.sessionInfo}
+        <h1 class="session-title">Matches for {matchData.sessionInfo.name}</h1>
       {/if}
     </div>
 
     {#if isLoading}
-      <div class="loading">Loading matching results...</div>
+      <div class="loading">Loading match results...</div>
     {:else if errorMessage}
       <div class="error-message">
         {errorMessage}
-        <div class="error-actions">
-          <button class="retry-button" on:click={loadResults}>Retry</button>
-          <button class="home-button" on:click={goHome}>Go Home</button>
-        </div>
+        <button class="back-button secondary" on:click={goBack}>Go Back</button>
       </div>
-    {:else if sessionData}
+    {:else if matchData && ((matchData.hasMatches && matchData.matches) || (matchData.matches && matchData.matches.length > 0))}
       <div class="session-info">
         <div class="session-details">
-          <span class="session-code-label">Session:</span>
+          <span class="session-code-label">Session Code:</span>
           <span class="session-code">{sessionCode}</span>
         </div>
-        <div class="results-stats">
-          {matches.length} compatibility {matches.length === 1
+        <div class="match-info">
+          {matchData.matches.length} compatibility {matchData.matches.length ===
+          1
             ? "match"
             : "matches"} found
         </div>
       </div>
 
-      {#if matches.length > 0}
-        <div class="matches-grid">
-          {#each matches as match, index}
-            <div class="match-card">
-              <div class="match-header">
-                <div class="match-rank">#{index + 1}</div>
-                <div
-                  class="compatibility-score"
-                  style="color: {getScoreColor(match.score)}"
-                >
-                  {formatScore(match.score)}%
+      <div class="matches-grid">
+        {#each matchData.matches as match, index}
+          <div class="match-card">
+            <div class="match-header">
+              <div class="match-rank">#{index + 1}</div>
+              <div
+                class="compatibility-score"
+                style="color: {getCompatibilityColor(match.score)}"
+              >
+                {formatPercentage(match.score)}%
+              </div>
+            </div>
+
+            <div class="match-participants">
+              <div class="participant">
+                <div class="participant-avatar">
+                  {getInitials(match.userA.name)}
+                </div>
+                <div class="participant-name">{match.userA.name}</div>
+              </div>
+
+              <div class="match-connector">
+                <div class="compatibility-bar">
+                  <div
+                    class="compatibility-fill"
+                    style="width: {formatPercentage(
+                      match.score
+                    )}%; background-color: {getCompatibilityColor(match.score)}"
+                  ></div>
+                </div>
+                <div class="compatibility-description">
+                  {getCompatibilityDescription(match.score)}
                 </div>
               </div>
 
-              <div class="users-container">
-                <div class="user-info">
-                  <div class="user-avatar">
-                    {getInitials(match.userA.name)}
-                  </div>
-                  <div class="user-name">{match.userA.name}</div>
+              <div class="participant">
+                <div class="participant-avatar">
+                  {getInitials(match.userB.name)}
                 </div>
-
-                <div class="match-connector">
-                  <div class="match-line"></div>
-                  <div class="match-heart">💕</div>
-                  <div class="match-line"></div>
-                </div>
-
-                <div class="user-info">
-                  <div class="user-avatar">
-                    {getInitials(match.userB.name)}
-                  </div>
-                  <div class="user-name">{match.userB.name}</div>
-                </div>
+                <div class="participant-name">{match.userB.name}</div>
               </div>
+            </div>
 
+            {#if match.details}
               <div class="match-details">
-                <div class="score-label">
-                  {getScoreLabel(match.score)}
+                <div class="detail-section">
+                  <h4>Compatibility Breakdown</h4>
+                  <div class="detail-item">
+                    <span>Artist Similarity:</span>
+                    <span>{formatPercentage(match.details.artistScore)}%</span>
+                  </div>
+                  <div class="detail-item">
+                    <span>Track Similarity:</span>
+                    <span>{formatPercentage(match.details.trackScore)}%</span>
+                  </div>
+                  <div class="detail-item">
+                    <span>Common Artists:</span>
+                    <span>{match.details.commonArtists}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span>Common Tracks:</span>
+                    <span>{match.details.commonTracks}</span>
+                  </div>
                 </div>
 
-                {#if match.details.topCommonArtists?.length > 0}
-                  <div class="common-elements">
-                    <div class="common-title">Shared Artists:</div>
-                    <div class="common-list">
-                      {match.details.topCommonArtists.slice(0, 3).join(", ")}
-                      {#if match.details.commonArtists > 3}
-                        <span class="more-count"
-                          >+{match.details.commonArtists - 3} more</span
-                        >
-                      {/if}
+                {#if match.details.topCommonArtists && match.details.topCommonArtists.length > 0}
+                  <div class="detail-section">
+                    <h4>Top Common Artists</h4>
+                    <div class="common-items">
+                      {#each match.details.topCommonArtists as artist}
+                        <span class="common-item">{artist}</span>
+                      {/each}
                     </div>
                   </div>
                 {/if}
 
-                <div class="detailed-scores">
-                  <div class="score-item">
-                    <span class="score-type">Artists:</span>
-                    <span class="score-value"
-                      >{formatScore(match.details.artistScore)}%</span
-                    >
+                {#if match.details.topCommonTracks && match.details.topCommonTracks.length > 0}
+                  <div class="detail-section">
+                    <h4>Top Common Tracks</h4>
+                    <div class="common-items">
+                      {#each match.details.topCommonTracks as track}
+                        <span class="common-item">{track}</span>
+                      {/each}
+                    </div>
                   </div>
-                  <div class="score-item">
-                    <span class="score-type">Tracks:</span>
-                    <span class="score-value"
-                      >{formatScore(match.details.trackScore)}%</span
-                    >
-                  </div>
-                </div>
+                {/if}
               </div>
-            </div>
-          {/each}
-        </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
 
-        <div class="results-actions">
-          <button class="share-button" on:click={shareResults}>
-            Share Results
-          </button>
-          <button class="new-session-button" on:click={goHome}>
-            Start New Session
-          </button>
-        </div>
-      {:else}
-        <div class="no-matches">
-          <h2>No Matches Found</h2>
-          <p>
-            Try adding more participants with Last.fm profiles, or check back
-            later.
-          </p>
-          <button class="retry-button" on:click={goBack}>Back to Session</button
-          >
+      <div class="results-actions">
+        <button
+          class="rerun-button"
+          disabled={isRerunning}
+          on:click={rerunMatching}
+        >
+          {isRerunning ? "Re-running..." : "Re-run Matches"}
+        </button>
+      </div>
+
+      {#if matchData.errors && matchData.errors.length > 0}
+        <div class="errors-section">
+          <h3>Profile Errors</h3>
+          <div class="error-list">
+            {#each matchData.errors as error}
+              <div class="error-item">
+                User {error.userCode}: {error.error}
+              </div>
+            {/each}
+          </div>
         </div>
       {/if}
+    {:else}
+      <div class="no-matches">
+        <h2>No matches found</h2>
+        <p>
+          This could happen if participants don't have enough music data or
+          profiles couldn't be built.
+        </p>
+        <button class="back-button secondary" on:click={goBack}>Go Back</button>
+      </div>
     {/if}
   </div>
 
-  <!-- Modal for share feedback -->
+  <!-- Modal for feedback -->
   {#if showModal}
     <div class="modal {modalType}">
       {modalMessage}
@@ -269,129 +343,140 @@
     background: linear-gradient(135deg, #ffff60 0%, #f0f048 100%);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 2rem;
-    position: relative;
-    overflow-y: auto;
+    font-family: "Instrument Serif", serif;
+  }
+
+  .brand-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0 1rem 0;
   }
 
   .results-container {
-    background-color: #e8e8d0;
-    border: 3px solid #000;
-    border-radius: 15px;
+    flex: 1;
     padding: 2rem;
-    width: 90%;
     max-width: 1200px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    margin-top: 4rem;
+    margin: 0 auto;
+    width: 100%;
   }
 
   .menu-header {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 2rem;
     margin-bottom: 2rem;
-    flex-wrap: wrap;
   }
 
   .back-button {
-    font-size: 18pt;
-    font-family: "Instrument Serif", serif;
-    padding: 0.5rem 1rem;
-    background-color: #d0d0b8;
-    color: #000;
+    background: #e8e8d0;
     border: 2px solid #000;
+    padding: 0.75rem 1.5rem;
     border-radius: 8px;
     cursor: pointer;
+    font-family: "Instrument Serif", serif;
+    font-size: 16pt;
     transition: all 0.2s ease;
   }
 
   .back-button:hover {
-    background-color: #b8b8a0;
-    transform: translateY(-1px);
+    background: #ddd;
+    transform: translateY(-2px);
+  }
+
+  .back-button.secondary {
+    background: #f5f5f5;
   }
 
   .session-title {
-    font-size: 28pt;
-    font-weight: 400;
-    color: #000;
+    font-size: 24pt;
     margin: 0;
-    font-family: "Instrument Serif", serif;
+    color: #000;
+  }
+
+  .loading,
+  .error-message,
+  .no-matches {
+    text-align: center;
+    padding: 3rem;
+    background: #e8e8d0;
+    border: 2px solid #000;
+    border-radius: 15px;
+    margin: 2rem 0;
+  }
+
+  .error-message,
+  .no-matches {
+    font-size: 18pt;
   }
 
   .session-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background-color: #f5f5f5;
+    background: #e8e8d0;
     border: 2px solid #000;
-    border-radius: 8px;
-    flex-wrap: wrap;
-    gap: 1rem;
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
   }
 
   .session-details {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 1rem;
   }
 
   .session-code-label {
-    font-size: 14pt;
+    font-size: 16pt;
     color: #666;
   }
 
   .session-code {
     font-size: 20pt;
     font-weight: bold;
-    color: #000;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    background: #fff;
+    padding: 0.5rem 1rem;
+    border: 2px solid #000;
+    border-radius: 8px;
   }
 
-  .results-stats {
-    font-size: 18pt;
-    font-weight: bold;
-    color: #000;
+  .match-info {
+    font-size: 16pt;
+    color: #333;
   }
 
   .matches-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 1.5rem;
+    gap: 2rem;
     margin-bottom: 2rem;
   }
 
   .match-card {
-    background-color: #f9f9f9;
+    background: #e8e8d0;
     border: 2px solid #000;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: all 0.2s ease;
+    border-radius: 20px;
+    padding: 2rem;
+    transition: transform 0.2s ease;
   }
 
   .match-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
   }
 
   .match-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
   }
 
   .match-rank {
+    background: #000;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
     font-size: 16pt;
     font-weight: bold;
-    color: #666;
-    background-color: #e0e0e0;
-    padding: 0.25rem 0.75rem;
-    border-radius: 15px;
   }
 
   .compatibility-score {
@@ -399,333 +484,250 @@
     font-weight: bold;
   }
 
-  .users-container {
-    display: flex;
+  .match-participants {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: 2rem;
+    margin-bottom: 2rem;
   }
 
-  .user-info {
+  .participant {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    flex: 1;
   }
 
-  .user-avatar {
-    width: 50px;
-    height: 50px;
+  .participant-avatar {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    background-color: #c8a2c8;
+    background: #fff;
+    border: 2px solid #000;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18pt;
     font-weight: bold;
-    color: #000;
-    border: 2px solid #000;
   }
 
-  .user-name {
-    font-size: 14pt;
+  .participant-name {
+    font-size: 16pt;
     font-weight: bold;
-    color: #000;
     text-align: center;
-    font-family: "Instrument Serif", serif;
   }
 
   .match-connector {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    flex: 0 0 auto;
   }
 
-  .match-line {
-    width: 20px;
-    height: 2px;
-    background-color: #ff6b9d;
+  .compatibility-bar {
+    width: 150px;
+    height: 20px;
+    background: #ddd;
+    border: 2px solid #000;
+    border-radius: 10px;
+    overflow: hidden;
   }
 
-  .match-heart {
-    font-size: 18pt;
+  .compatibility-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+  }
+
+  .compatibility-description {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
   }
 
   .match-details {
-    border-top: 1px solid #ddd;
-    padding-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #000;
   }
 
-  .score-label {
+  .detail-section h4 {
     font-size: 16pt;
-    font-weight: bold;
+    margin: 0 0 1rem 0;
     color: #333;
-    text-align: center;
-    margin-bottom: 0.75rem;
   }
 
-  .common-elements {
-    margin-bottom: 0.75rem;
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #ccc;
   }
 
-  .common-title {
+  .detail-item:last-child {
+    border-bottom: none;
+  }
+
+  .common-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .common-item {
+    background: #fff;
+    border: 1px solid #000;
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
     font-size: 12pt;
-    font-weight: bold;
-    color: #666;
-    margin-bottom: 0.25rem;
-  }
-
-  .common-list {
-    font-size: 11pt;
-    color: #555;
-    line-height: 1.3;
-  }
-
-  .more-count {
-    color: #888;
-    font-style: italic;
-  }
-
-  .detailed-scores {
-    display: flex;
-    justify-content: space-around;
-    gap: 1rem;
-  }
-
-  .score-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .score-type {
-    font-size: 11pt;
-    color: #666;
-  }
-
-  .score-value {
-    font-size: 14pt;
-    font-weight: bold;
-    color: #333;
   }
 
   .results-actions {
     display: flex;
-    gap: 1rem;
     justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .share-button,
-  .new-session-button,
-  .retry-button,
-  .home-button {
-    font-family: "Instrument Serif", serif;
-    font-size: 18pt;
-    padding: 1rem 2rem;
-    border: 2px solid #000;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .share-button {
-    background-color: #d0d0b8;
-    color: #000;
-  }
-
-  .share-button:hover {
-    background-color: #b8b8a0;
-    transform: translateY(-1px);
-  }
-
-  .new-session-button {
-    background-color: #a8d8a8;
-    color: #000;
-  }
-
-  .new-session-button:hover {
-    background-color: #90c090;
-    transform: translateY(-1px);
-  }
-
-  .retry-button {
-    background-color: #ffd88a;
-    color: #000;
-  }
-
-  .retry-button:hover {
-    background-color: #ffcc70;
-    transform: translateY(-1px);
-  }
-
-  .home-button {
-    background-color: #ffb3b3;
-    color: #000;
-  }
-
-  .home-button:hover {
-    background-color: #ff9999;
-    transform: translateY(-1px);
-  }
-
-  .loading {
-    text-align: center;
-    font-size: 20pt;
-    color: #666;
-    padding: 3rem;
-  }
-
-  .error-message {
-    background-color: #ffe6e6;
-    border: 2px solid #ff4444;
-    border-radius: 8px;
-    color: #cc0000;
-    padding: 1.5rem;
-    text-align: center;
-    font-size: 16pt;
     margin: 2rem 0;
   }
 
-  .error-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .no-matches {
-    text-align: center;
-    padding: 3rem;
-  }
-
-  .no-matches h2 {
-    font-size: 24pt;
-    color: #333;
-    margin-bottom: 1rem;
+  .rerun-button {
+    background: #4ade80;
+    border: 2px solid #000;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    cursor: pointer;
     font-family: "Instrument Serif", serif;
+    font-size: 18pt;
+    font-weight: bold;
+    color: #000;
+    transition: all 0.2s ease;
   }
 
-  .no-matches p {
-    font-size: 16pt;
-    color: #666;
-    margin-bottom: 2rem;
-    line-height: 1.4;
+  .rerun-button:hover:not(:disabled) {
+    background: #22c55e;
+    transform: translateY(-2px);
   }
 
-  /* Responsive design */
-  @media (max-width: 768px) {
-    .results-container {
-      padding: 1.5rem;
-      width: 95%;
-      margin-top: 3rem;
-    }
-
-    .session-title {
-      font-size: 22pt;
-    }
-
-    .matches-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-
-    .session-info {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .results-actions {
-      flex-direction: column;
-    }
-
-    .share-button,
-    .new-session-button {
-      font-size: 16pt;
-      padding: 0.8rem 1.5rem;
-    }
+  .rerun-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
   }
 
-  @media (max-width: 480px) {
-    .results-container {
-      padding: 1rem;
-    }
+  .errors-section {
+    background: #fee2e2;
+    border: 2px solid #dc2626;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+  }
 
-    .session-title {
-      font-size: 18pt;
-    }
+  .errors-section h3 {
+    margin: 0 0 1rem 0;
+    color: #dc2626;
+  }
 
-    .match-card {
-      padding: 1rem;
-    }
+  .error-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
-    .compatibility-score {
-      font-size: 20pt;
-    }
-
-    .user-avatar {
-      width: 40px;
-      height: 40px;
-      font-size: 16pt;
-    }
-
-    .user-name {
-      font-size: 12pt;
-    }
-
-    .share-button,
-    .new-session-button {
-      font-size: 14pt;
-      padding: 0.6rem 1rem;
-    }
+  .error-item {
+    background: #fff;
+    border: 1px solid #dc2626;
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: #dc2626;
   }
 
   .modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: #f5f5f5;
-    border: 2px solid #000;
+    top: 20px;
+    right: 20px;
+    padding: 1rem 2rem;
     border-radius: 8px;
-    padding: 1rem 1.5rem;
-    font-size: 16pt;
-    font-family: "Instrument Serif", serif;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 2px solid #000;
+    font-weight: bold;
     z-index: 1000;
-    animation: fadeInOut 3s ease-in-out;
+    animation: slideIn 0.3s ease;
   }
 
   .modal.success {
-    background-color: #e6ffe6;
-    border-color: #44aa44;
-    color: #006600;
+    background: #d1fae5;
+    color: #065f46;
   }
 
   .modal.error {
-    background-color: #ffe6e6;
-    border-color: #aa4444;
-    color: #cc0000;
+    background: #fee2e2;
+    color: #991b1b;
   }
 
-  @keyframes fadeInOut {
-    0% {
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.9);
     }
-    10%,
-    90% {
+    to {
+      transform: translateX(0);
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
     }
-    100% {
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .results-container {
+      padding: 1rem;
+    }
+
+    .menu-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .session-title {
+      font-size: 20pt;
+    }
+
+    .session-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .match-participants {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .match-connector {
+      order: 3;
+    }
+
+    .compatibility-bar {
+      width: 200px;
+    }
+
+    .match-details {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .session-title,
+    .compatibility-score {
+      font-size: 18pt;
+    }
+
+    .participant-avatar {
+      width: 50px;
+      height: 50px;
+      font-size: 14pt;
+    }
+
+    .compatibility-bar {
+      width: 150px;
     }
   }
 </style>

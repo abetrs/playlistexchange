@@ -16,6 +16,7 @@
   let modalMessage = "";
   let modalType = "success"; // "success" or "error"
   let isMatching = false;
+  let hasExistingMatches = false;
 
   onMount(async () => {
     // Get session code from params
@@ -61,11 +62,34 @@
         console.error("Failed to fetch participants");
         participants = [];
       }
+
+      // Check for existing matches
+      await checkForExistingMatches();
     } catch (error) {
       console.error("Error loading session data:", error);
       errorMessage = "Failed to load session data";
     } finally {
       isLoading = false;
+    }
+  }
+
+  async function checkForExistingMatches() {
+    try {
+      const matchesResponse = await fetch(
+        API_ENDPOINTS.GET_SESSION_MATCHES(sessionCode)
+      );
+
+      if (matchesResponse.ok) {
+        const matchesData = await matchesResponse.json();
+        console.log("Checking for existing matches:", matchesData); // Debug log
+        hasExistingMatches =
+          matchesData.hasMatches ||
+          (matchesData.matches && matchesData.matches.length > 0);
+        console.log("Has existing matches:", hasExistingMatches); // Debug log
+      }
+    } catch (error) {
+      console.error("Error checking for existing matches:", error);
+      hasExistingMatches = false;
     }
   }
 
@@ -184,18 +208,20 @@
       const matchData = await matchResponse.json();
       console.log("Matches computed:", matchData);
 
-      showSuccessModal("Matching complete! Redirecting to results...");
+      showSuccessModal("Matching complete!");
 
-      // Navigate to results page after a short delay
-      setTimeout(() => {
-        window.navigate(`/results/${sessionCode}`);
-      }, 2000);
+      // Update the state to show matches are available
+      hasExistingMatches = true;
     } catch (error) {
       console.error("Error starting matching:", error);
       showErrorModal(`Failed to start matching: ${error.message}`);
     } finally {
       isMatching = false;
     }
+  }
+
+  function viewMatches() {
+    window.navigate(`/results/${sessionCode}`);
   }
 </script>
 
@@ -274,13 +300,27 @@
         <button class="share-button" on:click={shareSessionCode}>
           Share Session Code
         </button>
-        <button
-          class="start-button"
-          disabled={participants.length < 2 || isMatching}
-          on:click={startMatching}
-        >
-          {isMatching ? "Processing..." : "Start Matching"}
-        </button>
+
+        {#if hasExistingMatches}
+          <button class="view-matches-button" on:click={viewMatches}>
+            View Matches
+          </button>
+          <button
+            class="rerun-button"
+            disabled={participants.length < 2 || isMatching}
+            on:click={startMatching}
+          >
+            {isMatching ? "Re-running..." : "Re-run Matches"}
+          </button>
+        {:else}
+          <button
+            class="start-button"
+            disabled={participants.length < 2 || isMatching}
+            on:click={startMatching}
+          >
+            {isMatching ? "Processing..." : "Start Matching"}
+          </button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -509,7 +549,9 @@
   }
 
   .share-button,
-  .start-button {
+  .start-button,
+  .view-matches-button,
+  .rerun-button {
     font-family: "Instrument Serif", serif;
     font-size: 18pt;
     padding: 1rem 2rem;
@@ -540,6 +582,34 @@
   }
 
   .start-button:disabled {
+    background-color: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .view-matches-button {
+    background-color: #4ade80;
+    color: #000;
+    font-weight: bold;
+  }
+
+  .view-matches-button:hover {
+    background-color: #22c55e;
+    transform: translateY(-1px);
+  }
+
+  .rerun-button {
+    background-color: #fbbf24;
+    color: #000;
+  }
+
+  .rerun-button:hover:not(:disabled) {
+    background-color: #f59e0b;
+    transform: translateY(-1px);
+  }
+
+  .rerun-button:disabled {
     background-color: #e0e0e0;
     color: #999;
     cursor: not-allowed;
@@ -614,7 +684,9 @@
     }
 
     .share-button,
-    .start-button {
+    .start-button,
+    .view-matches-button,
+    .rerun-button {
       font-size: 14pt;
       padding: 0.8rem 1.5rem;
     }

@@ -350,6 +350,79 @@ async function updateSession(sessionCode, updateData) {
 }
 
 /**
+ * Store match data in separate matches collection
+ * @param {string} sessionCode - Session code
+ * @param {Object} matchData - Match data to store
+ * @returns {Promise<string>} Match document ID
+ */
+async function storeMatchData(sessionCode, matchData) {
+  try {
+    const matchRef = db.collection("matches").doc();
+    const matchId = matchRef.id;
+
+    const matchDocument = {
+      id: matchId,
+      sessionCode,
+      matches: matchData.matches,
+      sessionInfo: matchData.sessionInfo,
+      errors: matchData.errors || [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await matchRef.set(matchDocument);
+
+    console.log(
+      `Match data stored with ID: ${matchId} for session ${sessionCode}`
+    );
+    return matchId;
+  } catch (error) {
+    console.error(
+      `Error storing match data for session ${sessionCode}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Get match data from matches collection
+ * @param {string} sessionCode - Session code
+ * @returns {Promise<Object|null>} Match data or null if not found
+ */
+async function getMatchData(sessionCode) {
+  try {
+    // Query without orderBy to avoid needing composite index
+    const matchesQuery = db
+      .collection("matches")
+      .where("sessionCode", "==", sessionCode);
+
+    const querySnapshot = await matchesQuery.get();
+
+    if (querySnapshot.empty) {
+      return null;
+    }
+
+    // Sort by createdAt in JavaScript to get the most recent
+    const matches = [];
+    querySnapshot.forEach((doc) => {
+      matches.push(doc.data());
+    });
+
+    // Sort by createdAt descending and get the most recent
+    matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return matches[0]; // Return the most recent match
+  } catch (error) {
+    console.error(
+      `Error getting match data for session ${sessionCode}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
  * Matches users in a session by calculating pairwise compatibility scores.
  * @param {string} sessionCode - Session code
  * @returns {Promise<Array>} Sorted matches [{pair: [code1, code2], score, userA: {}, userB: {}, details: {}}].
@@ -456,22 +529,7 @@ async function computeMatches(sessionCode) {
       }`
     );
 
-    // Prepare update data, filtering out undefined values for Firestore
-    const updateData = {
-      matches,
-      matchingCompletedAt: new Date(),
-      status: "matched",
-    };
-
-    // Only add profileErrors if there are any
-    if (profileErrors.length > 0) {
-      updateData.profileErrors = profileErrors;
-    }
-
-    // Store matches in session
-    await updateSession(sessionCode, updateData);
-
-    return {
+    const matchData = {
       matches,
       sessionInfo: {
         code: sessionCode,
@@ -481,6 +539,31 @@ async function computeMatches(sessionCode) {
         matchesGenerated: matches.length,
       },
       errors: profileErrors,
+    };
+
+    // Store matches in separate matches collection
+    const matchId = await storeMatchData(sessionCode, matchData);
+
+    // Update session with reference to match data and status
+    const sessionUpdateData = {
+      matchingCompletedAt: new Date(),
+      status: "matched",
+      currentMatchId: matchId, // Reference to the current match
+    };
+
+    // Only add profileErrors if there are any
+    if (profileErrors.length > 0) {
+      sessionUpdateData.profileErrors = profileErrors;
+    } else {
+      // Clear any previous profile errors
+      sessionUpdateData.profileErrors = [];
+    }
+
+    await updateSession(sessionCode, sessionUpdateData);
+
+    return {
+      matchId,
+      ...matchData,
     };
   } catch (error) {
     console.error(`Error computing matches for session ${sessionCode}:`, error);
@@ -495,30 +578,50 @@ async function computeMatches(sessionCode) {
  */
 async function getSessionMatches(sessionCode) {
   try {
-    const session = await getSessionByCode(sessionCode);
+    // First check if there are matches in the matches collection
+    const matchData = await getMatchData(sessionCode);
 
-    if (!session.matches) {
+    if (matchData) {
       return {
-        matches: [],
-        sessionInfo: {
-          code: sessionCode,
-          name: session.name,
-          status: session.status || "waiting",
-          message: "No matches computed yet. Run matching first.",
-        },
+        matches: matchData.matches,
+        sessionInfo: matchData.sessionInfo,
+        errors: matchData.errors || [],
+        matchCreatedAt: matchData.createdAt,
+        matchUpdatedAt: matchData.updatedAt,
+        hasMatches: true,
       };
     }
 
+    // Fallback: check session document for legacy matches
+    const session = await getSessionByCode(sessionCode);
+
+    if (session.matches && session.matches.length > 0) {
+      return {
+        matches: session.matches,
+        sessionInfo: {
+          code: sessionCode,
+          name: session.name,
+          status: session.status,
+          matchingCompletedAt: session.matchingCompletedAt,
+          participantCount: session.participants?.length || 0,
+        },
+        errors: session.profileErrors || [],
+        hasMatches: true,
+      };
+    }
+
+    // No matches found
     return {
-      matches: session.matches,
+      matches: [],
       sessionInfo: {
         code: sessionCode,
         name: session.name,
-        status: session.status,
-        matchingCompletedAt: session.matchingCompletedAt,
+        status: session.status || "waiting",
         participantCount: session.participants?.length || 0,
+        message: "No matches computed yet. Run matching first.",
       },
-      errors: session.profileErrors || [],
+      errors: [],
+      hasMatches: false,
     };
   } catch (error) {
     console.error(`Error getting session matches for ${sessionCode}:`, error);
@@ -539,4 +642,6 @@ module.exports = {
   updateSession,
   computeMatches,
   getSessionMatches,
+  storeMatchData,
+  getMatchData,
 };
