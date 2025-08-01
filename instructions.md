@@ -48,7 +48,6 @@ This file will guide our collaboration in building "The Playlist Exchange" appli
 14. **Session Matching System:** Automated matching computation and results storage
 15. **Match Database System:** Separate matches collection for persistent match storage
 16. **Results Display:** Complete UI for showing detailed compatibility matches and user information
-17. **Playlist Exchange System:** Full playlist linking functionality for matched participants with auto-refresh
 
 ---
 
@@ -124,7 +123,7 @@ frontend/
 - `POST /user` - Create new user with name and Last.fm username
 - `GET /user/:code` - Get user by user code
 - `GET /user/lastfm/:username` - Find user by Last.fm username
-- `PUT /user/:code` - Update user information (includes playlist linking)
+- `PUT /user/:code` - Update user information
 - `DELETE /user/:code` - Delete user
 - `POST /user/:code/taste-profile` - Build/refresh user taste profile
 - `GET /user/:code/taste-profile` - Retrieve cached user taste profile
@@ -242,7 +241,7 @@ async function getMatchData(sessionCode) {
 2. **Create Page** (`Create.svelte`) - Session creation with group name and size selection
 3. **Join Page** (`Join.svelte`) - Join sessions with name and Last.fm username input
 4. **Participants Page** (`Participants.svelte`) - Dashboard showing session participants and status
-5. **Results Page** (`Results.svelte`) - Comprehensive match results display with compatibility analysis and playlist exchange functionality
+5. **Results Page** (`Results.svelte`) - Comprehensive match results display with compatibility analysis
 
 ### New Features Implemented
 
@@ -276,9 +275,9 @@ async function getMatchData(sessionCode) {
 - Fallback support for older browsers
 
 **Session Persistence & Rejoin System:**
-- LocalStorage tracking of user's last joined session with userCode for playlist identification
+- LocalStorage tracking of user's last joined session
 - "Join Session" button on home page for quick rejoining
-- Automatic session info storage (session code, user code, user name, session name)
+- Automatic session info storage (session code, user name, session name)
 - Dismissible rejoin prompt with visual feedback
 
 **User Validation & Duplicate Prevention:**
@@ -839,11 +838,6 @@ GET /user/session/:sessionCode/lastfm  // Get Last.fm data for all session parti
   name: "John Doe",                   // User's display name
   lastfmUsername: "johndoe_music",    // Last.fm username
   spotifyId: null,                    // Spotify user ID (when connected)
-  playlist: {                         // Linked playlist for exchanges
-    name: "My Favorite Songs",        // User-provided playlist name
-    url: "https://spotify.com/...",   // Playlist URL (any platform)
-    linkedAt: Timestamp               // When playlist was linked
-  },
   createdAt: Timestamp,               // Account creation date
   updatedAt: Timestamp,               // Last modification date
   profileData: {                      // Music service profile data
@@ -1337,149 +1331,8 @@ setTimeout(() => {
 1. **WebSocket Integration**: Replace polling with real-time updates for participant joins/leaves
 2. **Profile Data**: Connect to Last.fm/Spotify APIs for real user data
 3. **Matching Algorithm**: Implement the compatibility scoring system
+4. **Playlist Exchange**: Add the core functionality once matching is complete
 
 ---
 
-## 🎵 Playlist Exchange System Implementation
-
-### Overview
-
-The Playlist Exchange system is the core functionality that allows users to link and share playlists with their compatibility matches. This feature enables actual music discovery and exchange between participants who have been matched based on their music taste profiles.
-
-### How It Works
-
-**Post-Matching Workflow:**
-1. After compatibility analysis completes, users navigate to `/results/{sessionCode}`
-2. Each match displays two participant cards with compatibility information
-3. Below each participant's name and avatar, there's a playlist section
-4. Current user sees input form, other users show playlist status
-
-### Playlist Section Types
-
-**For Current User (Logged In):**
-- **No playlist linked:** Shows input form with playlist name and URL fields
-- **Playlist already linked:** Shows the linked playlist as a clickable button
-
-**For Other Users:**
-- **Playlist linked:** Shows the playlist name as a clickable button
-- **No playlist linked:** Shows "Waiting for playlist..." message
-
-### Technical Implementation
-
-**Backend Changes:**
-
-Enhanced User Model:
-```javascript
-{
-  code: "ABCD1234",
-  name: "John Doe",
-  lastfmUsername: "johndoe_music",
-  spotifyId: null,
-  playlist: {
-    name: "My Favorite Songs",           // User-provided playlist name
-    url: "https://spotify.com/...",     // Playlist URL (any platform)
-    linkedAt: Timestamp                 // When playlist was linked
-  },
-  // ... existing fields
-}
-```
-
-**API Updates:**
-- `PUT /user/{userCode}` - Enhanced to handle playlist data with automatic timestamps
-- `GET /user/{userCode}` - Returns user with playlist information and backward compatibility
-
-**Frontend Changes:**
-
-**Results.svelte Enhancements:**
-- **Playlist Forms:** Input fields for current user to link playlists
-- **Playlist Buttons:** Clickable buttons showing linked playlists with music note icons
-- **Playlist Modal:** Popup for viewing playlist details and opening external links
-- **Waiting States:** Visual indicators when playlists aren't linked yet
-- **Auto-refresh:** Page automatically refreshes after successful playlist submission
-
-**User Identification:**
-- Uses localStorage session data to identify current user from `userCode`
-- Compares current user's code with participant codes in matches
-- Shows different UI based on whether viewing own or others' playlists
-
-### User Experience Flow
-
-1. **Complete Matching** → Compatibility analysis generates matches
-2. **Navigate to Results** → Users view `/results/{sessionCode}` for match details
-3. **Link Playlists** → Current user fills form with playlist name and URL
-4. **Submit & Refresh** → Playlist saved with auto-page refresh to show updated state
-5. **View Others' Playlists** → Click on playlist buttons to open modal
-6. **Access Music** → "Open Playlist" button launches external playlist in new tab
-
-### Feature Specifications
-
-**Input Validation:**
-- Playlist name: Required, trimmed whitespace
-- Playlist URL: Required, valid URL format
-- Platform agnostic: Accepts any music service URL
-
-**User Interface:**
-- Responsive design for mobile and desktop
-- Consistent styling with existing design system (#e8e8d0 backgrounds, #000 borders)
-- Disabled states during API calls
-- Success/error feedback via modals
-- Music note emoji (🎵) for playlist buttons
-
-**Platform Support:**
-- 🎵 Spotify playlists
-- 🎵 Apple Music playlists
-- 🎵 YouTube Music playlists  
-- 🎵 SoundCloud playlists
-- 🎵 Any music platform with shareable links
-
-**Security & Data Safety:**
-- URLs not validated for specific platforms (allows any music service)
-- Playlists linked to specific user accounts
-- Timestamps track when playlists were linked
-- User authentication based on localStorage session data
-
-### Implementation Features
-
-**Current User Experience:**
-- ✅ Input form for playlist name and URL
-- ✅ Form validation (required fields)
-- ✅ Success/error feedback via modals
-- ✅ Disabled state during API calls
-- ✅ Automatic form clearing after successful submission
-- ✅ Auto-refresh after playlist linking (2-second delay)
-
-**Other Users Experience:**
-- ✅ "Waiting for playlist..." message when no playlist linked
-- ✅ Clickable playlist buttons when playlists are available
-- ✅ Modal popup with playlist details and metadata
-- ✅ Direct link to open playlists in new tabs
-- ✅ Timestamp display showing when playlist was linked
-
-**Responsive Design:**
-- ✅ Mobile-friendly playlist forms with proper input sizing
-- ✅ Responsive modal sizing with backdrop
-- ✅ Touch-friendly buttons and inputs
-- ✅ Proper keyboard navigation and ESC key support
-
-### Integration Points
-
-**Navigation Integration:**
-- Participants page "Start Exchange" button navigates to results
-- Results page "Back to Session" button returns to participants
-- Global navigation system supports `/results/{sessionCode}` route
-
-**Data Flow:**
-- localStorage provides current user identification
-- API endpoints handle playlist CRUD operations
-- Firestore stores playlist data with user documents
-- Real-time UI updates via Svelte reactivity
-
-**Error Handling:**
-- Network error detection with user-friendly messages
-- API failure handling with retry mechanisms
-- Form validation prevents invalid submissions
-- Modal feedback for all user actions
-
----
-
-This instructions file reflects the current implementation state and provides comprehensive guidance for testing, API integration, and user interface development for The Playlist Exchange application. All major structural components are in place, including the complete playlist exchange functionality, with robust testing tools and detailed integration guides for continued development.
+This instructions file reflects the current implementation state and provides comprehensive guidance for testing, API integration, and user interface development for The Playlist Exchange application. All major structural components are in place, with robust testing tools and detailed integration guides for continued development.

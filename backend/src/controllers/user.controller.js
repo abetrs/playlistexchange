@@ -24,11 +24,6 @@ const createUser = async (req, res) => {
       name: name,
       lastfmUsername: lastfmUsername || null,
       spotifyId: spotifyId || null,
-      playlist: {
-        name: null,
-        url: null,
-        linkedAt: null,
-      },
       createdAt: new Date(),
       updatedAt: new Date(),
       profileData: {
@@ -64,17 +59,7 @@ const getUserByCode = async (req, res) => {
     }
 
     const userData = doc.data();
-
-    // Ensure playlist field exists for backward compatibility
-    if (!userData.playlist) {
-      userData.playlist = {
-        name: null,
-        url: null,
-        linkedAt: null,
-      };
-    }
-
-    res.status(200).json({ user: userData });
+    res.status(200).json(userData);
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({ message: "Failed to fetch user." });
@@ -85,7 +70,7 @@ const getUserByCode = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { code } = req.params;
-    const { name, lastfmUsername, spotifyId, profileData, playlist } = req.body;
+    const { name, lastfmUsername, spotifyId, profileData } = req.body;
 
     const userRef = db.collection("users").doc(code);
     const doc = await userRef.get();
@@ -103,17 +88,6 @@ const updateUser = async (req, res) => {
       updateData.lastfmUsername = lastfmUsername;
     if (spotifyId !== undefined) updateData.spotifyId = spotifyId;
     if (profileData !== undefined) updateData.profileData = profileData;
-    if (playlist !== undefined) {
-      // Handle playlist updates - add linkedAt timestamp if linking a new playlist
-      if (playlist.name && playlist.url && !doc.data().playlist?.linkedAt) {
-        updateData.playlist = {
-          ...playlist,
-          linkedAt: new Date(),
-        };
-      } else {
-        updateData.playlist = playlist;
-      }
-    }
 
     await userRef.update(updateData);
 

@@ -22,7 +22,6 @@ export const API_ENDPOINTS = {
   // User endpoints
   USERS: `${CONFIG.BACKEND_URL}/user`,
   USER_BY_CODE: (code) => `${CONFIG.BACKEND_URL}/user/${code}`,
-  UPDATE_USER: (code) => `${CONFIG.BACKEND_URL}/user/${code}`,
   USER_BY_LASTFM: (username) => `${CONFIG.BACKEND_URL}/user/lastfm/${username}`,
 
   // User taste profile endpoints
